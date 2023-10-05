@@ -1,0 +1,17 @@
+#ifndef NTORRENT_NETLIB_HEADER_H
+#define NTORRENT_NETLIB_HEADER_H
+#include <thread>
+#include <mutex>
+#include <deque>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <chrono>
+#include <cstdint>
+#define ASIO_STANDALONE
+#include <asio.hpp>
+#include <asio/ts/buffer.hpp>
+#include <asio/ts/internet.hpp>
+#endif //NTORRENT_NETLIB_HEADER_H
