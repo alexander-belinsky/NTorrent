@@ -23,13 +23,32 @@ namespace netlib {
             return header_.id_;
         }
 
-        size_t getSize() const {
+        uint32_t getSize() const {
             return header_.size_;
         }
 
         friend std::ostream& operator << (std::ostream& os, const Message<T>& msg) {
             os << "Id: " << int(msg.getId()) << " Size: " << msg.getSize();
             return os;
+        }
+
+        template<typename D>
+        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const std::vector<D>& data) {
+            uint32_t sz = data.size();
+            for (const D& item: data)
+                msg << item;
+            msg << sz;
+            return msg;
+        }
+
+        template<typename D>
+        friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, std::vector<D>& data) {
+            uint32_t sz;
+            msg >> sz;
+            data.resize(sz);
+            for (uint32_t i = 0; i < sz; i++)
+                msg >> data[sz - i - 1];
+            return msg;
         }
 
         template<typename D>
@@ -58,6 +77,5 @@ namespace netlib {
     struct OwnedMessage {
         Message<T> msg_;
         std::shared_ptr<Session<T>> session_;
-
     };
 }
