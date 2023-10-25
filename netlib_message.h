@@ -27,6 +27,11 @@ namespace netlib {
             return header_.size_;
         }
 
+        void clear() {
+            header_.size_ = 0;
+            body_.clear();
+        }
+
         friend std::ostream& operator << (std::ostream& os, const Message<T>& msg) {
             os << "Id: " << int(msg.getId()) << " Size: " << msg.getSize();
             return os;

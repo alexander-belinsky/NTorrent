@@ -5,3 +5,4 @@
 #include "netlib_header.h"
 #include "netlib_session.h"
 #include "netlib_compress.h"
+#include "netlib_server.h"

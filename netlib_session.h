@@ -8,13 +8,13 @@ namespace netlib {
     class Session : public std::enable_shared_from_this<Session<T>> {
 
     public:
-        Session(asio::io_context &context, SafeQueue<Message<T>> &queueIn, asio::ip::tcp::socket &&socket, int id) :
+        Session(asio::io_context &context, SafeQueue<OwnedMessage<T>> &queueIn, asio::ip::tcp::socket &&socket, int id) :
         socket_(std::move(socket)), context_(context), queueIn_(queueIn)  {
             id_ = id;
             is_writing = false;
         }
 
-        virtual ~Session() {}
+        virtual ~Session() = default;
 
         void send(const Message<T>& msg) {
             std::scoped_lock lock(mutex_);
@@ -32,6 +32,33 @@ namespace netlib {
         void disconnect() {
             socket_.close();
         };
+
+        void asyncDisconnect() {
+            if (isConnected())
+                asio::post(context_, [this]{socket_.close();});
+        }
+
+        bool isConnected() const {
+            return socket_.is_open();
+        }
+
+        void connect(asio::ip::tcp::resolver::results_type &ep) {
+            asio::async_connect(socket_, ep,
+                [this] (std::error_code ec, asio::ip::tcp::endpoint &ep) {
+                    if (!ec) {
+                        readHeader();
+                    }
+                }
+            );
+        }
+
+        void startListening() {
+            asio::post(context_,
+                [this] () {
+                    readHeader();
+                }
+            );
+        }
 
     private:
 
@@ -76,10 +103,40 @@ namespace netlib {
 
         void readHeader() {
             asio::async_read(socket_, asio::buffer(&tempMsgIn_.header_, sizeof(MessageHeader<T>)),
-                 [this] (std::error_code er, size_t length) {
-
+                [this] (std::error_code er, size_t length) {
+                    if (!er) {
+                        if (tempMsgIn_.header_.size_ > 0) {
+                            tempMsgIn_.body_.resize(tempMsgIn_.header_.size_);
+                            readBody();
+                        }
+                        else {
+                            addToQueue();
+                        }
+                    }
+                    else {
+                        disconnect();
+                    }
                 }
             );
+        }
+
+        void readBody() {
+            asio::async_read(socket_, asio::buffer(&tempMsgIn_.body_.data(), tempMsgIn_.body_.size()),
+                 [this] (std::error_code er, size_t length) {
+                     if (!er) {
+                         addToQueue();
+                     }
+                     else {
+                         disconnect();
+                     }
+                 }
+            );
+        }
+
+        void addToQueue() {
+            queueIn_.push_back({this->shared_from_this(), tempMsgIn_});
+            tempMsgIn_.clear();
+            readHeader();
         }
 
     private:
@@ -87,7 +144,7 @@ namespace netlib {
         asio::io_context &context_;
         SafeQueue<Message<T>> queueOut_;
         Message<T> tempMsgOut_;
-        SafeQueue<Message<T>> &queueIn_;
+        SafeQueue<OwnedMessage<T>> &queueIn_;
         Message<T> tempMsgIn_;
         std::mutex mutex_;
         bool is_writing;
