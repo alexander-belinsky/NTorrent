@@ -21,7 +21,6 @@ namespace netlib {
             queueOut_.push_back(msg);
             asio::post(context_,
                    [this, msg] {
-                    queueOut_.push_back(msg);
                     if (!is_writing) {
                         writeHeader();
                     }
@@ -42,11 +41,13 @@ namespace netlib {
             return socket_.is_open();
         }
 
-        void connect(asio::ip::tcp::resolver::results_type &ep) {
+        void connectWithEndpoint(asio::ip::tcp::resolver::results_type &ep) {
             asio::async_connect(socket_, ep,
-                [this] (std::error_code ec, asio::ip::tcp::endpoint &ep) {
+                [this] (std::error_code ec, asio::ip::tcp::endpoint ep) {
                     if (!ec) {
                         readHeader();
+                    } else {
+                        std::cerr << ec.message() << "\n";
                     }
                 }
             );
@@ -58,6 +59,14 @@ namespace netlib {
                     readHeader();
                 }
             );
+        }
+
+        asio::basic_socket<asio::ip::tcp>::endpoint_type getEndpoint() {
+            return socket_.remote_endpoint();
+        }
+
+        uint16_t getId() {
+            return id_;
         }
 
     private:
@@ -121,7 +130,7 @@ namespace netlib {
         }
 
         void readBody() {
-            asio::async_read(socket_, asio::buffer(&tempMsgIn_.body_.data(), tempMsgIn_.body_.size()),
+            asio::async_read(socket_, asio::buffer(tempMsgIn_.body_.data(), tempMsgIn_.body_.size()),
                  [this] (std::error_code er, size_t length) {
                      if (!er) {
                          addToQueue();

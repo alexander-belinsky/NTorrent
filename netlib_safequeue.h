@@ -55,7 +55,7 @@ namespace netlib {
 
         T pop_back() {
             std::scoped_lock lock(mutex_);
-            T item = std::move(deque_.backfront());
+            T item = std::move(deque_.back());
             deque_.pop_back();
             return item;
         }

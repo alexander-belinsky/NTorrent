@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <map>
 #include <chrono>
 #include <cstdint>
 #define ASIO_STANDALONE

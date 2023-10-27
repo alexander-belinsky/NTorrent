@@ -1,7 +1,6 @@
 #pragma once
 
 #include "netlib_header.h"
-//#include "netlib_session.h"
 
 namespace netlib {
     template<typename T>
@@ -14,6 +13,8 @@ namespace netlib {
     struct Message {
         MessageHeader<T> header_;
         std::vector<uint8_t> body_;
+
+        Message() = default;
 
         explicit Message(T id) {
             header_.id_ = id;
@@ -82,5 +83,9 @@ namespace netlib {
     struct OwnedMessage {
         Message<T> msg_;
         std::shared_ptr<Session<T>> session_;
+
+        OwnedMessage(std::shared_ptr<Session<T>> session, Message<T> msg) : msg_(msg), session_(session){
+
+        }
     };
 }
