@@ -33,9 +33,30 @@ namespace netlib {
             body_.clear();
         }
 
+        bool empty() {
+            return header_.size_ == 0;
+        };
+
         friend std::ostream& operator << (std::ostream& os, const Message<T>& msg) {
             os << "Id: " << int(msg.getId()) << " Size: " << msg.getSize();
             return os;
+        }
+
+        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const std::string& data) {
+            std::vector<char> vec;
+            for (char c: data)
+                vec.push_back(c);
+            msg << vec;
+            return msg;
+        }
+
+        friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, std::string& data) {
+            std::vector<char> vec;
+            msg >> vec;
+            data.clear();
+            for (char c: vec)
+                data.push_back(c);
+            return msg;
         }
 
         template<typename D>

@@ -1,10 +1,8 @@
 #include "netlib.h"
 #include <iostream>
 
-enum class MsgTypes {
-    Connect,
-    IntMessage,
-    Fire,
+enum class MsgTypes : uint16_t {
+    StringMessage,
 };
 
 class CustomServer: public netlib::Server<MsgTypes> {
@@ -21,7 +19,7 @@ public:
 
     void onMessage(netlib::OwnedMessage<MsgTypes> &msg) {
         std::cout << "New message from " << msg.session_->getId() << "\n";
-        int msgContent;
+        std::string msgContent;
         msg.msg_ >> msgContent;
         std::cout << "  Content: " << msgContent << "\n";
     }
@@ -31,8 +29,8 @@ public:
     }
 };
 
-void updateCircle(CustomServer &Server) {
-    while (1) {
+void updateCircle(CustomServer &Server, bool &running) {
+    while (running) {
         Server.update();
     }
 };
@@ -42,7 +40,8 @@ int main() {
     std::cin >> port;
     CustomServer Server(port);
     Server.start();
-    std::thread thread(updateCircle, std::ref(Server));
+    bool flag = true;
+    std::thread thread(updateCircle, std::ref(Server), std::ref(flag));
     while(1) {
         char command;
         std::cin >> command;
@@ -53,14 +52,17 @@ int main() {
             Server.connectToHost(host, conPort);
         } else if (command == 'm') {
             uint16_t id;
-            int msgContent;
+            std::string msgContent;
             std::cin >> id >> msgContent;
-            netlib::Message<MsgTypes> msg(MsgTypes::IntMessage);
+            netlib::Message<MsgTypes> msg(MsgTypes::StringMessage);
             msg << msgContent;
             Server.sendMessage(id, msg);
         } else if (command == 'e') {
             break;
         }
     }
+    flag = false;
+    thread.join();
+    Server.stop();
     return 0;
 }
