@@ -11,8 +11,9 @@ namespace netlib {
     class Server {
     public:
 
-        Server(uint16_t port) {
-            curId_ = port;
+        Server(uint16_t port) :
+        acceptor_(context_, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)) {
+
         }
 
         ~Server() {
@@ -20,30 +21,26 @@ namespace netlib {
         }
 
         void start() {
-            idleWork_ = new asio::io_context::work(context_);
+            waitForConnection();
             contextThread_ = std::thread([this]() {context_.run();});
-            std::cout << "[SERVER] Started" << "\n";
+            std::cout << "[SERVER] Started: " << acceptor_.local_endpoint() << "\n";
         }
 
         void stop() {
             context_.stop();
-            delete idleWork_;
             if (contextThread_.joinable()) contextThread_.join();
             std::cout << "[SERVER] Stopped\n";
         }
 
         void connectToHost(std::string &host, uint16_t port) {
             try {
-                asio::ip::udp::resolver resolver(context_);
-                asio::ip::udp::resolver::query query(host, std::to_string(port));
-                asio::ip::udp::resolver::iterator iter = resolver.resolve(query);
+                asio::ip::tcp::resolver resolver(context_);
+                asio::ip::tcp::resolver::query query(host, std::to_string(port));
+                asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(query);
                 std::shared_ptr<Session<T>> newSes =
-                        std::make_shared<Session<T>>(context_, queueIn_, asio::ip::udp::socket(context_, asio::ip::udp::v4()), curId_);
-                asio::ip::udp::endpoint localEndpoint = asio::ip::udp::endpoint(asio::ip::address_v4::from_string(localAddress_), curId_);
-                newSes->bindToLocalEndpoint(localEndpoint);
-                newSes->connectWithEndpoint(*iter);
-                sessionsMap_[curId_] = newSes;
-                std::cout << "[SERVER]: New UDP connection to " << (*iter).endpoint() << " created on " << localEndpoint << "\n";
+                        std::make_shared<Session<T>>(context_, queueIn_, asio::ip::tcp::socket(context_), curId_);
+                sessionsMap_[curId_] = std::move(newSes);
+                sessionsMap_[curId_]->connectWithEndpoint(endpoints);
                 curId_++;
             }
             catch (std::exception &ex) {
@@ -52,10 +49,8 @@ namespace netlib {
         }
 
         void sendMessage(uint16_t id, Message<T> &msg) {
-            if (sessionsMap_.find(id) == sessionsMap_.end()) {
-                std::cout << "There is no such port!\n";
+            if (sessionsMap_.find(id) == sessionsMap_.end())
                 return;
-            }
             std::shared_ptr<Session<T>> client = sessionsMap_[id];
             if (client && client->isConnected()) {
                 client->send(msg);
@@ -74,7 +69,35 @@ namespace netlib {
             }
         }
 
+    private:
+        void waitForConnection() {
+            acceptor_.async_accept(
+            [this] (std::error_code er, asio::ip::tcp::socket sock) {
+                if (!er) {
+                    std::cout << "[SERVER] New connection\n";
+                    std::shared_ptr<Session<T>> newSes =
+                            std::make_shared<Session<T>>(context_, queueIn_, std::move(sock), curId_);
+                    if (onConnect(newSes)) {
+                        sessionsMap_[curId_] = std::move(newSes);
+                        sessionsMap_[curId_]->startListening();
+                        curId_++;
+                    }
+                } else {
+                    std::cerr << "[SERVER] Connection error\n";
+                }
+                waitForConnection();
+            }
+            );
+        }
+
+
+
+
     protected:
+
+        virtual bool onConnect(std::shared_ptr<Session<T>> session) {
+            return true;
+        };
 
         virtual void onMessage(OwnedMessage<T> &msg) {
 
@@ -86,11 +109,10 @@ namespace netlib {
 
     protected:
         asio::io_context context_;
-        asio::io_context::work* idleWork_;
+        asio::ip::tcp::acceptor acceptor_;
         std::thread contextThread_;
         SafeQueue<OwnedMessage<T>> queueIn_;
         std::map<uint16_t, std::shared_ptr<Session<T>>> sessionsMap_;
         uint16_t curId_ = 999;
-        std::string localAddress_ = "127.0.0.1";
     };
 }
