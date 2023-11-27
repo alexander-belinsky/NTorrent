@@ -8,7 +8,7 @@ namespace netlib {
     class Session : public std::enable_shared_from_this<Session<T>> {
 
     public:
-        Session(asio::io_context &context, SafeQueue<OwnedMessage<T>> &queueIn, asio::ip::tcp::socket &&socket, int id) :
+        Session(asio::io_context &context, SafeQueue<OwnedMessage<T>> &queueIn, asio::ip::udp::socket &&socket, int id) :
         socket_(std::move(socket)), context_(context), queueIn_(queueIn)  {
             id_ = id;
             is_writing = false;
@@ -41,9 +41,13 @@ namespace netlib {
             return socket_.is_open();
         }
 
-        void connectWithEndpoint(asio::ip::tcp::resolver::results_type &ep) {
-            asio::async_connect(socket_, ep,
-                [this] (std::error_code ec, asio::ip::tcp::endpoint ep) {
+        void bindToLocalEndpoint(asio::ip::udp::endpoint &ep) {
+            socket_.bind(ep);
+        }
+
+        void connectWithEndpoint(asio::ip::udp::endpoint ep) {
+            socket_.async_connect(ep,
+                [this] (std::error_code ec) {
                     if (!ec) {
                         readHeader();
                     } else {
@@ -61,7 +65,7 @@ namespace netlib {
             );
         }
 
-        asio::basic_socket<asio::ip::tcp>::endpoint_type getEndpoint() {
+        asio::basic_socket<asio::ip::udp>::endpoint_type getEndpoint() {
             return socket_.remote_endpoint();
         }
 
@@ -74,7 +78,7 @@ namespace netlib {
         void writeHeader() {
             is_writing = true;
             tempMsgOut_ = std::move(queueOut_.pop_back());
-            asio::async_write(socket_, asio::buffer(&tempMsgOut_.header_, sizeof(MessageHeader<T>)),
+            socket_.async_send(asio::buffer(&tempMsgOut_.header_, sizeof(MessageHeader<T>)),
                 [this] (std::error_code er, size_t length) {
                     if (!er) {
                         if (tempMsgOut_.body_.size() > 0) {
@@ -95,7 +99,7 @@ namespace netlib {
         }
 
         void writeBody() {
-            asio::async_write(socket_, asio::buffer(tempMsgOut_.body_.data(), tempMsgOut_.body_.size()),
+            socket_.async_send(asio::buffer(tempMsgOut_.body_.data(), tempMsgOut_.body_.size()),
                 [this] (std::error_code er, size_t length) {
                     if (!er) {
                         if (!queueOut_.empty())
@@ -111,7 +115,7 @@ namespace netlib {
         }
 
         void readHeader() {
-            asio::async_read(socket_, asio::buffer(&tempMsgIn_.header_, sizeof(MessageHeader<T>)),
+            socket_.async_receive(asio::buffer(&tempMsgIn_.header_, sizeof(MessageHeader<T>)),
                 [this] (std::error_code er, size_t length) {
                     if (!er) {
                         if (tempMsgIn_.header_.size_ > 0) {
@@ -130,7 +134,7 @@ namespace netlib {
         }
 
         void readBody() {
-            asio::async_read(socket_, asio::buffer(tempMsgIn_.body_.data(), tempMsgIn_.body_.size()),
+            socket_.async_receive(asio::buffer(tempMsgIn_.body_.data(), tempMsgIn_.body_.size()),
                  [this] (std::error_code er, size_t length) {
                      if (!er) {
                          addToQueue();
@@ -149,7 +153,7 @@ namespace netlib {
         }
 
     private:
-        asio::ip::tcp::socket socket_;
+        asio::ip::udp::socket socket_;
         asio::io_context &context_;
         SafeQueue<Message<T>> queueOut_;
         Message<T> tempMsgOut_;

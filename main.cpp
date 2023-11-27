@@ -12,11 +12,6 @@ public:
     {
     }
 
-    bool onConnect(std::shared_ptr<netlib::Session<MsgTypes>> session) {
-        std::cout << "New connection: " << session->getEndpoint() << " with id " << session->getId() << "\n";
-        return true;
-    }
-
     void onMessage(netlib::OwnedMessage<MsgTypes> &msg) {
         std::cout << "New message from " << msg.session_->getId() << "\n";
         std::string msgContent;
