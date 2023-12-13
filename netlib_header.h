@@ -11,6 +11,7 @@
 #include <map>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #define ASIO_STANDALONE
 #include <asio.hpp>
 #include <asio/ts/buffer.hpp>

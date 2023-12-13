@@ -4,6 +4,7 @@
 #include "netlib_message.h"
 #include "netlib_safequeue.h"
 #include "netlib_session.h"
+#include "netlib_filemanager.h"
 
 namespace netlib {
 
