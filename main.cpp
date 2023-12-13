@@ -3,6 +3,7 @@
 
 enum class MsgTypes : uint16_t {
     StringMessage,
+    PingMessage,
 };
 
 class CustomServer: public netlib::Server<MsgTypes> {
@@ -19,9 +20,13 @@ public:
 
     void onMessage(netlib::OwnedMessage<MsgTypes> &msg) {
         std::cout << "New message from " << msg.session_->getId() << "\n";
-        std::string msgContent;
-        msg.msg_ >> msgContent;
-        std::cout << "  Content: " << msgContent << "\n";
+        if (msg.msg_.header_.id_ == MsgTypes::PingMessage) {
+            std::cout << "Ping\n";
+        } else {
+            std::string msgContent;
+            msg.msg_ >> msgContent;
+            std::cout << "  Content: " << msgContent << "\n";
+        }
     }
 
     void onDisconnect(std::shared_ptr<netlib::Session<MsgTypes>> session) {
@@ -49,7 +54,7 @@ int main() {
             std::string host;
             uint16_t conPort;
             std::cin >> host >> conPort;
-            Server.connectToHost(host, conPort);
+            Server.connectToHost(host, conPort, MsgTypes::PingMessage);
         } else if (command == 'm') {
             uint16_t id;
             std::string msgContent;
@@ -59,6 +64,8 @@ int main() {
             Server.sendMessage(id, msg);
         } else if (command == 'e') {
             break;
+        } else if (command == 'g') {
+            std::cout << Server.getRealEp() << "\n";
         }
     }
     flag = false;
