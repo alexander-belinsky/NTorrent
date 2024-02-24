@@ -1,28 +1,50 @@
 #include "netlib.h"
 #include <iostream>
 
+#define CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
 enum class MsgTypes : uint16_t {
     StringMessage,
     PingMessage,
+    PongMessage,
+
+    StartFile,
+    SendFile,
+    FinishFile,
+
+    // Events:
+
+    SendFileEvent,
+
 };
+
+std::ostream& operator << (std::ostream &out, MsgTypes el) {
+    out << (uint16_t) el;
+    return out;
+}
+
+inline void EnableMemLeakCheck()
+{
+    _CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
+}
 
 class CustomServer: public netlib::Server<MsgTypes> {
 public:
 
-    CustomServer(uint16_t port) : netlib::Server<MsgTypes>(port)
+    CustomServer(std::string l, uint16_t port, MsgTypes pingType, MsgTypes pongType) : netlib::Server<MsgTypes>(l, port, pingType, pongType)
     {
     }
 
-    bool onConnect(std::shared_ptr<netlib::Session<MsgTypes>> session) {
-        std::cout << "New connection: " << session->getEndpoint() << " with id " << session->getId() << "\n";
-        return true;
-    }
-
     void onMessage(netlib::OwnedMessage<MsgTypes> &msg) {
-        std::cout << "New message from " << msg.session_->getId() << "\n";
+        //std::cout << "New message from " << msg.session_->getId() << "\n";
         if (msg.msg_.header_.id_ == MsgTypes::PingMessage) {
-            std::cout << "Ping\n";
-        } else {
+            if (!isConnected_) {
+                std::cout << "Ping\n";
+                isConnected_ = true;
+            }
+        } else if (msg.msg_.header_.id_ == MsgTypes::StringMessage) {
             std::string msgContent;
             msg.msg_ >> msgContent;
             std::cout << "  Content: " << msgContent << "\n";
@@ -32,6 +54,8 @@ public:
     void onDisconnect(std::shared_ptr<netlib::Session<MsgTypes>> session) {
         std::cout << "Disconnection from: " << session->getId() << "\n";
     }
+
+    bool isConnected_ = false;
 };
 
 void updateCircle(CustomServer &Server, bool &running) {
@@ -41,20 +65,27 @@ void updateCircle(CustomServer &Server, bool &running) {
 };
 
 int main() {
+    EnableMemLeakCheck();
+    std::string localAddress;
     uint16_t port;
-    std::cin >> port;
-    CustomServer Server(port);
+    std::cin >> localAddress >> port;
+
+    CustomServer Server(localAddress, port, MsgTypes::PingMessage, MsgTypes::PongMessage);
     Server.start();
     bool flag = true;
     std::thread thread(updateCircle, std::ref(Server), std::ref(flag));
-    while(1) {
+    std::string downloadPath;
+    std:: cin >> downloadPath;
+    while (1) {
         char command;
         std::cin >> command;
         if (command == 'c') {
             std::string host;
             uint16_t conPort;
             std::cin >> host >> conPort;
-            Server.connectToHost(host, conPort, MsgTypes::PingMessage);
+            uint16_t id = Server.connectToHost(host, conPort);
+            auto *fileManager = new netlib::FileManager(MsgTypes::StartFile, MsgTypes::SendFile, MsgTypes::FinishFile, MsgTypes::SendFileEvent, downloadPath);
+            Server.addModule(id, fileManager);
         } else if (command == 'm') {
             uint16_t id;
             std::string msgContent;
@@ -66,10 +97,23 @@ int main() {
             break;
         } else if (command == 'g') {
             std::cout << Server.getRealEp() << "\n";
+        } else if (command == 'a') {
+            uint16_t id;
+            std::cin >> id;
+        } else if (command == 'f') {
+            uint16_t id;
+            std::string path;
+            std::string name;
+            std::cin >> id;
+            std::cin >> path >> name;
+            netlib::Message<MsgTypes> msg(MsgTypes::SendFileEvent);
+            msg << name << path << id;
+            Server.pushEvent(msg);
         }
     }
     flag = false;
-    thread.join();
+    if (thread.joinable())
+        thread.join();
     Server.stop();
     return 0;
 }

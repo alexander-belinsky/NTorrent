@@ -3,11 +3,12 @@
 #include "netlib_server.h"
 
 namespace netlib {
+
     class StunSession {
     public:
-        StunSession(std::string &stun_host, uint16_t port, asio::io_context &context, asio::ip::udp::socket &sock):
-                socket_(sock), context_(context), timer(context) {
-            asio::ip::udp::resolver resolver(context_);
+        StunSession(std::string &stun_host, uint16_t port, asio::io_context *context, asio::ip::udp::socket &sock):
+                socket_(sock), context_(context), timer(*context) {
+            asio::ip::udp::resolver resolver(*context_);
             asio::ip::udp::resolver::query query(stun_host, std::to_string(port));
             asio::ip::udp::resolver::iterator iter = resolver.resolve(query);
             ep_ = *iter;
@@ -86,7 +87,7 @@ namespace netlib {
         asio::ip::udp::endpoint ep_;
         asio::ip::udp::endpoint realEp_;
         asio::ip::udp::socket& socket_;
-        asio::io_context& context_;
+        asio::io_context* context_;
         std::vector<uint8_t> reqString_;
         std::vector<uint8_t> ansString_;
         bool isRunning;

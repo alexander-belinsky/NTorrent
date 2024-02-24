@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdint>
 #include <fstream>
+#include <random>
 #define ASIO_STANDALONE
 #include <asio.hpp>
 #include <asio/ts/buffer.hpp>
