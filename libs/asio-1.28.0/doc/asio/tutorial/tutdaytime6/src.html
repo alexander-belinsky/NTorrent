@@ -51,7 +51,7 @@
 <span class="special">{</span>
 <span class="keyword">public</span><span class="special">:</span>
   <span class="identifier">udp_server</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">io_context</span><span class="special">&amp;</span> <span class="identifier">io_context</span><span class="special">)</span>
-    <span class="special">:</span> <span class="identifier">socket_</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">,</span> <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span><span class="special">(</span><span class="identifier">udp</span><span class="special">::</span><span class="identifier">v4</span><span class="special">(),</span> <span class="number">13</span><span class="special">))</span>
+    <span class="special">:</span> <span class="identifier">m_socket</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">,</span> <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span><span class="special">(</span><span class="identifier">udp</span><span class="special">::</span><span class="identifier">v4</span><span class="special">(),</span> <span class="number">13</span><span class="special">))</span>
   <span class="special">{</span>
     <span class="identifier">start_receive</span><span class="special">();</span>
   <span class="special">}</span>
@@ -59,7 +59,7 @@
 <span class="keyword">private</span><span class="special">:</span>
   <span class="keyword">void</span> <span class="identifier">start_receive</span><span class="special">()</span>
   <span class="special">{</span>
-    <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_receive_from</span><span class="special">(</span>
+    <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_receive_from</span><span class="special">(</span>
         <span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">recv_buffer_</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
         <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">udp_server</span><span class="special">::</span><span class="identifier">handle_receive</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span>
           <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">,</span>
@@ -74,7 +74,7 @@
       <span class="identifier">boost</span><span class="special">::</span><span class="identifier">shared_ptr</span><span class="special">&lt;</span><span class="identifier">std</span><span class="special">::</span><span class="identifier">string</span><span class="special">&gt;</span> <span class="identifier">message</span><span class="special">(</span>
           <span class="keyword">new</span> <span class="identifier">std</span><span class="special">::</span><span class="identifier">string</span><span class="special">(</span><span class="identifier">make_daytime_string</span><span class="special">()));</span>
 
-      <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_send_to</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">message</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
+      <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_send_to</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">message</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
           <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">udp_server</span><span class="special">::</span><span class="identifier">handle_send</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span> <span class="identifier">message</span><span class="special">,</span>
             <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">,</span>
             <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">bytes_transferred</span><span class="special">));</span>
@@ -89,7 +89,7 @@
   <span class="special">{</span>
   <span class="special">}</span>
 
-  <span class="identifier">udp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">socket_</span><span class="special">;</span>
+  <span class="identifier">udp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">m_socket</span><span class="special">;</span>
   <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span> <span class="identifier">remote_endpoint_</span><span class="special">;</span>
   <span class="identifier">boost</span><span class="special">::</span><span class="identifier">array</span><span class="special">&lt;</span><span class="keyword">char</span><span class="special">,</span> <span class="number">1</span><span class="special">&gt;</span> <span class="identifier">recv_buffer_</span><span class="special">;</span>
 <span class="special">};</span>

@@ -62,7 +62,7 @@
           will synchronously try all endpoints until one is successfully connected.
           Similarly, an asynchronous connect may be performed by writing:
         </p>
-<pre class="programlisting"><span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_connect</span><span class="special">(</span><span class="identifier">socket_</span><span class="special">,</span> <span class="identifier">iter</span><span class="special">,</span>
+<pre class="programlisting"><span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_connect</span><span class="special">(</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="identifier">iter</span><span class="special">,</span>
     <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">client</span><span class="special">::</span><span class="identifier">handle_connect</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span>
       <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">));</span>
 

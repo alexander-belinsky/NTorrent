@@ -285,7 +285,7 @@ asio::error_code win_iocp_socket_service_base::cancel(
   {
     // Asynchronous operations have been started from the current thread only,
     // so it is safe to try to cancel them using CancelIo.
-    socket_type sock = impl.socket_;
+    socket_type sock = impl.m_socket;
     HANDLE sock_as_handle = reinterpret_cast<HANDLE>(sock);
     if (!::CancelIo(sock_as_handle))
     {

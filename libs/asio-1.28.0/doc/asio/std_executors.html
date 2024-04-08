@@ -116,12 +116,12 @@
     </p>
 <pre class="programlisting"><span class="keyword">struct</span> <span class="identifier">minimal_io_executor</span>
 <span class="special">{</span>
-  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">execution_context</span><span class="special">*</span> <span class="identifier">context_</span><span class="special">;</span>
+  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">execution_context</span><span class="special">*</span> <span class="identifier">m_context</span><span class="special">;</span>
   <span class="identifier">queue_t</span> <span class="identifier">queue_</span><span class="special">;</span>
 
   <span class="keyword">bool</span> <span class="keyword">operator</span><span class="special">==(</span><span class="keyword">const</span> <span class="identifier">minimal_io_executor</span><span class="special">&amp;</span> <span class="identifier">other</span><span class="special">)</span> <span class="keyword">const</span> <span class="keyword">noexcept</span>
   <span class="special">{</span>
-    <span class="keyword">return</span> <span class="identifier">context_</span> <span class="special">==</span> <span class="identifier">other</span><span class="special">.</span><span class="identifier">context_</span> <span class="special">&amp;&amp;</span> <span class="identifier">queue_</span> <span class="special">==</span> <span class="identifier">other</span><span class="special">.</span><span class="identifier">queue_</span><span class="special">;</span>
+    <span class="keyword">return</span> <span class="identifier">m_context</span> <span class="special">==</span> <span class="identifier">other</span><span class="special">.</span><span class="identifier">m_context</span> <span class="special">&amp;&amp;</span> <span class="identifier">queue_</span> <span class="special">==</span> <span class="identifier">other</span><span class="special">.</span><span class="identifier">queue_</span><span class="special">;</span>
   <span class="special">}</span>
 
   <span class="keyword">bool</span> <span class="keyword">operator</span><span class="special">!=(</span><span class="keyword">const</span> <span class="identifier">minimal_io_executor</span><span class="special">&amp;</span> <span class="identifier">other</span><span class="special">)</span> <span class="keyword">const</span> <span class="keyword">noexcept</span>
@@ -132,7 +132,7 @@
   <span class="identifier">asio</span><span class="special">::</span><span class="identifier">execution_context</span><span class="special">&amp;</span> <span class="identifier">query</span><span class="special">(</span>
       <span class="identifier">asio</span><span class="special">::</span><span class="identifier">execution</span><span class="special">::</span><span class="identifier">context_t</span><span class="special">)</span> <span class="keyword">const</span> <span class="keyword">noexcept</span>
   <span class="special">{</span>
-    <span class="keyword">return</span> <span class="special">*</span><span class="identifier">context_</span><span class="special">;</span>
+    <span class="keyword">return</span> <span class="special">*</span><span class="identifier">m_context</span><span class="special">;</span>
   <span class="special">}</span>
 
   <span class="keyword">static</span> <span class="keyword">constexpr</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">execution</span><span class="special">::</span><span class="identifier">blocking_t</span><span class="special">::</span><span class="identifier">never_t</span> <span class="identifier">query</span><span class="special">(</span>

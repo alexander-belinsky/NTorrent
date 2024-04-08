@@ -38,7 +38,7 @@
 
   <span class="keyword">void</span> <span class="identifier">start</span><span class="special">()</span>
   <span class="special">{</span>
-    <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_read_until</span><span class="special">(</span><span class="identifier">socket_</span><span class="special">,</span> <span class="identifier">data_</span><span class="special">,</span> <span class="string">"\r\n"</span><span class="special">,</span>
+    <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_read_until</span><span class="special">(</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="identifier">data_</span><span class="special">,</span> <span class="string">"\r\n"</span><span class="special">,</span>
         <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">http_connection</span><span class="special">::</span><span class="identifier">handle_request_line</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span> <span class="identifier">_1</span><span class="special">));</span>
   <span class="special">}</span>
 
@@ -57,7 +57,7 @@
 
   <span class="special">...</span>
 
-  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">socket_</span><span class="special">;</span>
+  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">m_socket</span><span class="special">;</span>
   <span class="identifier">asio</span><span class="special">::</span><span class="identifier">streambuf</span> <span class="identifier">data_</span><span class="special">;</span>
 <span class="special">};</span>
 </pre>

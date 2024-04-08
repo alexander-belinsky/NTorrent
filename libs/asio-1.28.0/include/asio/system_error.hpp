@@ -46,14 +46,14 @@ public:
   /// Construct with an error code.
   system_error(const error_code& ec)
     : code_(ec),
-      context_()
+      m_context()
   {
   }
 
   /// Construct with an error code and context.
   system_error(const error_code& ec, const std::string& context)
     : code_(ec),
-      context_(context)
+      m_context(context)
   {
   }
 
@@ -61,7 +61,7 @@ public:
   system_error(const system_error& other)
     : std::exception(other),
       code_(other.code_),
-      context_(other.context_),
+      m_context(other.m_context),
       what_()
   {
   }
@@ -74,7 +74,7 @@ public:
   /// Assignment operator.
   system_error& operator=(const system_error& e)
   {
-    context_ = e.context_;
+    m_context = e.m_context;
     code_ = e.code_;
     what_.reset();
     return *this;
@@ -89,7 +89,7 @@ public:
     {
       if (!what_.get())
       {
-        std::string tmp(context_);
+        std::string tmp(m_context);
         if (tmp.length())
           tmp += ": ";
         tmp += code_.message();
@@ -116,7 +116,7 @@ private:
   error_code code_;
 
   // The context associated with the error.
-  std::string context_;
+  std::string m_context;
 
   // The string representation of the error.
   mutable asio::detail::scoped_ptr<std::string> what_;

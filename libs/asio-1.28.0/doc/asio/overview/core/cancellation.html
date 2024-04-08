@@ -132,7 +132,7 @@
   <span class="keyword">void</span> <span class="identifier">do_read</span><span class="special">()</span>
   <span class="special">{</span>
     <span class="keyword">auto</span> <span class="identifier">self</span> <span class="special">=</span> <span class="identifier">shared_from_this</span><span class="special">();</span>
-    <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_read_some</span><span class="special">(</span>
+    <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_read_some</span><span class="special">(</span>
         <span class="identifier">buffer</span><span class="special">(</span><span class="identifier">data_</span><span class="special">),</span>
         <span class="identifier">asio</span><span class="special">::</span><span class="identifier">bind_cancellation_slot</span><span class="special">(</span>
           <span class="identifier">cancel_signal_</span><span class="special">.</span><span class="identifier">slot</span><span class="special">(),</span>

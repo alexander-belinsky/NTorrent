@@ -159,7 +159,7 @@
   <span class="identifier">HANDLER_LOCATION</span><span class="special">;</span>
 
   <span class="keyword">auto</span> <span class="identifier">self</span><span class="special">(</span><span class="identifier">shared_from_this</span><span class="special">());</span>
-  <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">data_</span><span class="special">,</span> <span class="identifier">max_length</span><span class="special">),</span>
+  <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">data_</span><span class="special">,</span> <span class="identifier">max_length</span><span class="special">),</span>
       <span class="special">[</span><span class="keyword">this</span><span class="special">,</span> <span class="identifier">self</span><span class="special">](</span><span class="identifier">std</span><span class="special">::</span><span class="identifier">error_code</span> <span class="identifier">ec</span><span class="special">,</span> <span class="identifier">std</span><span class="special">::</span><span class="identifier">size_t</span> <span class="identifier">length</span><span class="special">)</span>
       <span class="special">{</span>
         <span class="identifier">HANDLER_LOCATION</span><span class="special">;</span>

@@ -1,5 +1,6 @@
 #ifndef NTORRENT_NETLIB_HEADER_H
 #define NTORRENT_NETLIB_HEADER_H
+
 #include <thread>
 #include <mutex>
 #include <deque>
@@ -17,4 +18,6 @@
 #include <asio.hpp>
 #include <asio/ts/buffer.hpp>
 #include <asio/ts/internet.hpp>
+#include "filesystem"
+
 #endif //NTORRENT_NETLIB_HEADER_H

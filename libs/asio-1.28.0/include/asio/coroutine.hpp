@@ -91,7 +91,7 @@ class coroutine_ref;
  *
  * This form of the @c yield keyword is often used with asynchronous operations:
  *
- * @code yield socket_->async_read_some(buffer(*buffer_), *this); @endcode
+ * @code yield m_socket->async_read_some(buffer(*buffer_), *this); @endcode
  *
  * This divides into four logical steps:
  *
@@ -112,7 +112,7 @@ class coroutine_ref;
  * @code yield
  * {
  *   mutable_buffers_1 b = buffer(*buffer_);
- *   socket_->async_read_some(b, *this);
+ *   m_socket->async_read_some(b, *this);
  * } @endcode
  *
  * <b>yield return <em>expression</em> ;</b>
@@ -205,8 +205,8 @@ class coroutine_ref;
  * {
  *   do
  *   {
- *     socket_.reset(new tcp::socket(my_context_));
- *     yield acceptor->async_accept(*socket_, *this);
+ *     m_socket.reset(new tcp::socket(my_context_));
+ *     yield acceptor->async_accept(*m_socket, *this);
  *     fork server(*this)();
  *   } while (is_parent());
  *   ... client-specific handling follows ...

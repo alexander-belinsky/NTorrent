@@ -60,14 +60,14 @@
 
   <span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">&amp;</span> <span class="identifier">socket</span><span class="special">()</span>
   <span class="special">{</span>
-    <span class="keyword">return</span> <span class="identifier">socket_</span><span class="special">;</span>
+    <span class="keyword">return</span> <span class="identifier">m_socket</span><span class="special">;</span>
   <span class="special">}</span>
 
   <span class="keyword">void</span> <span class="identifier">start</span><span class="special">()</span>
   <span class="special">{</span>
     <span class="identifier">message_</span> <span class="special">=</span> <span class="identifier">make_daytime_string</span><span class="special">();</span>
 
-    <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">socket_</span><span class="special">,</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">message_</span><span class="special">),</span>
+    <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">message_</span><span class="special">),</span>
         <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">tcp_connection</span><span class="special">::</span><span class="identifier">handle_write</span><span class="special">,</span> <span class="identifier">shared_from_this</span><span class="special">(),</span>
           <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">,</span>
           <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">bytes_transferred</span><span class="special">));</span>
@@ -75,7 +75,7 @@
 
 <span class="keyword">private</span><span class="special">:</span>
   <span class="identifier">tcp_connection</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">io_context</span><span class="special">&amp;</span> <span class="identifier">io_context</span><span class="special">)</span>
-    <span class="special">:</span> <span class="identifier">socket_</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">)</span>
+    <span class="special">:</span> <span class="identifier">m_socket</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">)</span>
   <span class="special">{</span>
   <span class="special">}</span>
 
@@ -84,7 +84,7 @@
   <span class="special">{</span>
   <span class="special">}</span>
 
-  <span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">socket_</span><span class="special">;</span>
+  <span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">m_socket</span><span class="special">;</span>
   <span class="identifier">std</span><span class="special">::</span><span class="identifier">string</span> <span class="identifier">message_</span><span class="special">;</span>
 <span class="special">};</span>
 

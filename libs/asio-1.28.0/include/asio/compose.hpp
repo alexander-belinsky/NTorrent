@@ -343,7 +343,7 @@ struct associator<Associator,
  *
  * @code struct async_echo_implementation
  * {
- *   tcp::socket& socket_;
+ *   tcp::socket& m_socket;
  *   asio::mutable_buffer buffer_;
  *   enum { starting, reading, writing } state_;
  *
@@ -356,7 +356,7 @@ struct associator<Associator,
  *     {
  *     case starting:
  *       state_ = reading;
- *       socket_.async_read_some(
+ *       m_socket.async_read_some(
  *           buffer_, std::move(self));
  *       break;
  *     case reading:
@@ -367,7 +367,7 @@ struct associator<Associator,
  *       else
  *       {
  *         state_ = writing;
- *         asio::async_write(socket_, buffer_,
+ *         asio::async_write(m_socket, buffer_,
  *             asio::transfer_exactly(n),
  *             std::move(self));
  *       }

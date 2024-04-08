@@ -59,7 +59,7 @@
         The constructor initialises a socket to listen on UDP port 13.
       </p>
 <pre class="programlisting">  <span class="identifier">udp_server</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">io_context</span><span class="special">&amp;</span> <span class="identifier">io_context</span><span class="special">)</span>
-    <span class="special">:</span> <span class="identifier">socket_</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">,</span> <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span><span class="special">(</span><span class="identifier">udp</span><span class="special">::</span><span class="identifier">v4</span><span class="special">(),</span> <span class="number">13</span><span class="special">))</span>
+    <span class="special">:</span> <span class="identifier">m_socket</span><span class="special">(</span><span class="identifier">io_context</span><span class="special">,</span> <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span><span class="special">(</span><span class="identifier">udp</span><span class="special">::</span><span class="identifier">v4</span><span class="special">(),</span> <span class="number">13</span><span class="special">))</span>
   <span class="special">{</span>
     <span class="identifier">start_receive</span><span class="special">();</span>
   <span class="special">}</span>
@@ -78,7 +78,7 @@
         value <code class="computeroutput"><span class="identifier">bytes_transferred</span></code> specifying
         the number of bytes received.
       </p>
-<pre class="programlisting">    <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_receive_from</span><span class="special">(</span>
+<pre class="programlisting">    <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_receive_from</span><span class="special">(</span>
         <span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(</span><span class="identifier">recv_buffer_</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
         <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">udp_server</span><span class="special">::</span><span class="identifier">handle_receive</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span>
           <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">,</span>
@@ -113,7 +113,7 @@
         We now call <a class="link" href="../reference/basic_datagram_socket/async_send_to.html" title="basic_datagram_socket::async_send_to">ip::udp::socket::async_send_to()</a>
         to serve the data to the client.
       </p>
-<pre class="programlisting">      <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">async_send_to</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">message</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
+<pre class="programlisting">      <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">async_send_to</span><span class="special">(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">message</span><span class="special">),</span> <span class="identifier">remote_endpoint_</span><span class="special">,</span>
           <span class="identifier">boost</span><span class="special">::</span><span class="identifier">bind</span><span class="special">(&amp;</span><span class="identifier">udp_server</span><span class="special">::</span><span class="identifier">handle_send</span><span class="special">,</span> <span class="keyword">this</span><span class="special">,</span> <span class="identifier">message</span><span class="special">,</span>
             <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">error</span><span class="special">,</span>
             <span class="identifier">asio</span><span class="special">::</span><span class="identifier">placeholders</span><span class="special">::</span><span class="identifier">bytes_transferred</span><span class="special">));</span>
@@ -146,7 +146,7 @@
   <span class="special">{</span>
   <span class="special">}</span>
 
-  <span class="identifier">udp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">socket_</span><span class="special">;</span>
+  <span class="identifier">udp</span><span class="special">::</span><span class="identifier">socket</span> <span class="identifier">m_socket</span><span class="special">;</span>
   <span class="identifier">udp</span><span class="special">::</span><span class="identifier">endpoint</span> <span class="identifier">remote_endpoint_</span><span class="special">;</span>
   <span class="identifier">boost</span><span class="special">::</span><span class="identifier">array</span><span class="special">&lt;</span><span class="keyword">char</span><span class="special">,</span> <span class="number">1</span><span class="special">&gt;</span> <span class="identifier">recv_buffer_</span><span class="special">;</span>
 <span class="special">};</span>

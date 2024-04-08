@@ -5,36 +5,36 @@
 namespace netlib {
     template<typename T>
     struct MessageHeader {
-        T id_{};
-        uint32_t size_ = 0;
+        T id{};
+        uint32_t size = 0;
     };
 
     template<typename T>
     struct Message {
-        MessageHeader<T> header_;
-        std::vector<uint8_t> body_;
+        MessageHeader<T> m_header;
+        std::vector<uint8_t> m_body;
 
         Message() = default;
 
         explicit Message(T id) {
-            header_.id_ = id;
+            m_header.id = id;
         }
 
         T getId() const {
-            return header_.id_;
+            return m_header.id;
         }
 
         uint32_t getSize() const {
-            return header_.size_;
+            return m_header.size;
         }
 
         void clear() {
-            header_.size_ = 0;
-            body_.clear();
+            m_header.size = 0;
+            m_body.clear();
         }
 
         bool empty() {
-            return header_.size_ == 0;
+            return m_header.size == 0;
         };
 
         friend std::ostream& operator << (std::ostream& os, const Message<T>& msg) {
@@ -79,20 +79,20 @@ namespace netlib {
         }
 
         template<typename D>
-        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const D& data) {
-            size_t prevSz = msg.body_.size();
-            msg.body_.resize(prevSz + sizeof(D));
-            std::memcpy(msg.body_.data() + prevSz, &data, sizeof(D));
-            msg.header_.size_ = msg.body_.size();
+        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, D data) {
+            size_t prevSz = msg.m_body.size();
+            msg.m_body.resize(prevSz + sizeof(D));
+            std::memcpy(msg.m_body.data() + prevSz, &data, sizeof(D));
+            msg.m_header.size = msg.m_body.size();
             return msg;
         }
 
         template<typename D>
         friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, D& data) {
-            size_t newSz = msg.body_.size() - sizeof(D);
-            std::memcpy(&data, msg.body_.data() + newSz, sizeof(D));
-            msg.body_.resize(newSz);
-            msg.header_.size_ = msg.body_.size();
+            size_t newSz = msg.m_body.size() - sizeof(D);
+            std::memcpy(&data, msg.m_body.data() + newSz, sizeof(D));
+            msg.m_body.resize(newSz);
+            msg.m_header.size = msg.m_body.size();
             return msg;
         }
     };
@@ -106,7 +106,6 @@ namespace netlib {
         std::shared_ptr<Session<T>> session_;
 
         OwnedMessage(std::shared_ptr<Session<T>> session, Message<T> msg) : msg_(msg), session_(session){
-
         }
     };
 }

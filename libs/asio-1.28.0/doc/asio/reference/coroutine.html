@@ -194,7 +194,7 @@
         This form of the <code class="computeroutput"><span class="identifier">yield</span></code> keyword
         is often used with asynchronous operations:
       </p>
-<pre class="programlisting"><span class="identifier">yield</span> <span class="identifier">socket_</span><span class="special">-&gt;</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">buffer_</span><span class="special">),</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
+<pre class="programlisting"><span class="identifier">yield</span> <span class="identifier">m_socket</span><span class="special">-&gt;</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">buffer_</span><span class="special">),</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
 </pre>
 <p>
         This divides into four logical steps:
@@ -229,7 +229,7 @@
 <pre class="programlisting"><span class="identifier">yield</span>
 <span class="special">{</span>
   <span class="identifier">mutable_buffers_1</span> <span class="identifier">b</span> <span class="special">=</span> <span class="identifier">buffer</span><span class="special">(*</span><span class="identifier">buffer_</span><span class="special">);</span>
-  <span class="identifier">socket_</span><span class="special">-&gt;</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">b</span><span class="special">,</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
+  <span class="identifier">m_socket</span><span class="special">-&gt;</span><span class="identifier">async_read_some</span><span class="special">(</span><span class="identifier">b</span><span class="special">,</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
 <span class="special">}</span>
 </pre>
 <p>
@@ -362,8 +362,8 @@
 <span class="special">{</span>
   <span class="keyword">do</span>
   <span class="special">{</span>
-    <span class="identifier">socket_</span><span class="special">.</span><span class="identifier">reset</span><span class="special">(</span><span class="keyword">new</span> <span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">(</span><span class="identifier">my_context_</span><span class="special">));</span>
-    <span class="identifier">yield</span> <span class="identifier">acceptor</span><span class="special">-&gt;</span><span class="identifier">async_accept</span><span class="special">(*</span><span class="identifier">socket_</span><span class="special">,</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
+    <span class="identifier">m_socket</span><span class="special">.</span><span class="identifier">reset</span><span class="special">(</span><span class="keyword">new</span> <span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">(</span><span class="identifier">my_context_</span><span class="special">));</span>
+    <span class="identifier">yield</span> <span class="identifier">acceptor</span><span class="special">-&gt;</span><span class="identifier">async_accept</span><span class="special">(*</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="special">*</span><span class="keyword">this</span><span class="special">);</span>
     <span class="identifier">fork</span> <span class="identifier">server</span><span class="special">(*</span><span class="keyword">this</span><span class="special">)();</span>
   <span class="special">}</span> <span class="keyword">while</span> <span class="special">(</span><span class="identifier">is_parent</span><span class="special">());</span>
   <span class="special">...</span> <span class="identifier">client</span><span class="special">-</span><span class="identifier">specific</span> <span class="identifier">handling</span> <span class="identifier">follows</span> <span class="special">...</span>

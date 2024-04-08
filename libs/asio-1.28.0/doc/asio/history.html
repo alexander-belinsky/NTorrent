@@ -735,12 +735,12 @@
         </p>
 <pre class="programlisting"><span class="keyword">struct</span> <span class="identifier">my_async_op</span>
 <span class="special">{</span>
-  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">&amp;</span> <span class="identifier">socket_</span> <span class="special">=</span> <span class="special">...;</span>
+  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">&amp;</span> <span class="identifier">m_socket</span> <span class="special">=</span> <span class="special">...;</span>
 
   <span class="keyword">template</span> <span class="special">&lt;</span><span class="keyword">typename</span> <span class="identifier">Token</span><span class="special">&gt;</span>
   <span class="keyword">auto</span> <span class="keyword">operator</span><span class="special">()(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">const_buffer</span> <span class="identifier">data</span><span class="special">,</span> <span class="identifier">Token</span><span class="special">&amp;&amp;</span> <span class="identifier">token</span><span class="special">)</span>
   <span class="special">{</span>
-    <span class="keyword">return</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">socket_</span><span class="special">,</span> <span class="identifier">data</span><span class="special">,</span>
+    <span class="keyword">return</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="identifier">data</span><span class="special">,</span>
         <span class="identifier">std</span><span class="special">::</span><span class="identifier">forward</span><span class="special">&lt;</span><span class="identifier">Token</span><span class="special">&gt;(</span><span class="identifier">token</span><span class="special">));</span>
   <span class="special">}</span>
 <span class="special">};</span>
@@ -770,12 +770,12 @@
         </p>
 <pre class="programlisting"><span class="keyword">struct</span> <span class="identifier">my_async_op</span>
 <span class="special">{</span>
-  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">&amp;</span> <span class="identifier">socket_</span> <span class="special">=</span> <span class="special">...;</span>
+  <span class="identifier">asio</span><span class="special">::</span><span class="identifier">ip</span><span class="special">::</span><span class="identifier">tcp</span><span class="special">::</span><span class="identifier">socket</span><span class="special">&amp;</span> <span class="identifier">m_socket</span> <span class="special">=</span> <span class="special">...;</span>
 
   <span class="keyword">template</span> <span class="special">&lt;</span><span class="keyword">typename</span> <span class="identifier">Token</span><span class="special">&gt;</span>
   <span class="keyword">auto</span> <span class="keyword">operator</span><span class="special">()(</span><span class="identifier">asio</span><span class="special">::</span><span class="identifier">const_buffer</span> <span class="identifier">data</span><span class="special">,</span> <span class="identifier">Token</span><span class="special">&amp;&amp;</span> <span class="identifier">token</span><span class="special">)</span>
   <span class="special">{</span>
-    <span class="keyword">return</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">socket_</span><span class="special">,</span> <span class="identifier">data</span><span class="special">,</span>
+    <span class="keyword">return</span> <span class="identifier">asio</span><span class="special">::</span><span class="identifier">async_write</span><span class="special">(</span><span class="identifier">m_socket</span><span class="special">,</span> <span class="identifier">data</span><span class="special">,</span>
         <span class="identifier">std</span><span class="special">::</span><span class="identifier">forward</span><span class="special">&lt;</span><span class="identifier">Token</span><span class="special">&gt;(</span><span class="identifier">token</span><span class="special">));</span>
   <span class="special">}</span>
 <span class="special">};</span>

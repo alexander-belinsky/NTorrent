@@ -1,119 +1,71 @@
 #include "netlib.h"
+#include "ui/cui.h"
 #include <iostream>
 
-#define CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
+using namespace cui;
 
-enum class MsgTypes : uint16_t {
-    StringMessage,
-    PingMessage,
-    PongMessage,
-
-    StartFile,
-    SendFile,
-    FinishFile,
-
-    // Events:
-
-    SendFileEvent,
-
-};
-
-std::ostream& operator << (std::ostream &out, MsgTypes el) {
-    out << (uint16_t) el;
-    return out;
+void importSettings(std::string &localAddress, uint16_t  &port, std::string &downloadsPath) {
+    std::ifstream fin("./.settings");
+    fin >> localAddress >> port >> downloadsPath;
 }
 
-inline void EnableMemLeakCheck()
-{
-    _CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
-}
-
-class CustomServer: public netlib::Server<MsgTypes> {
-public:
-
-    CustomServer(std::string l, uint16_t port, MsgTypes pingType, MsgTypes pongType) : netlib::Server<MsgTypes>(l, port, pingType, pongType)
-    {
+void printHex(uint64_t x) {
+    std::vector<char> dic = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    std::string res;
+    while (x > 0) {
+        res = dic[x % 16] + res;
+        x /= 16;
     }
+    std::cout << res;
+}
 
-    void onMessage(netlib::OwnedMessage<MsgTypes> &msg) {
-        //std::cout << "New message from " << msg.session_->getId() << "\n";
-        if (msg.msg_.header_.id_ == MsgTypes::PingMessage) {
-            if (!isConnected_) {
-                std::cout << "Ping\n";
-                isConnected_ = true;
-            }
-        } else if (msg.msg_.header_.id_ == MsgTypes::StringMessage) {
-            std::string msgContent;
-            msg.msg_ >> msgContent;
-            std::cout << "  Content: " << msgContent << "\n";
+void readHex(uint64_t &x) {
+    std::string s;
+    std::cin >> s;
+    std::reverse(s.begin(), s.end());
+    x = 0;
+    uint64_t pow = 1;
+    for (char c: s) {
+        if (c >= '0' && c <= '9') {
+            x += pow * (c - '0');
+        } else {
+            x += pow * (c - 'a' + 10);
         }
+        pow *= 16;
     }
-
-    void onDisconnect(std::shared_ptr<netlib::Session<MsgTypes>> session) {
-        std::cout << "Disconnection from: " << session->getId() << "\n";
-    }
-
-    bool isConnected_ = false;
-};
-
-void updateCircle(CustomServer &Server, bool &running) {
-    while (running) {
-        Server.update();
-    }
-};
+}
 
 int main() {
-    EnableMemLeakCheck();
-    std::string localAddress;
-    uint16_t port;
-    std::cin >> localAddress >> port;
 
-    CustomServer Server(localAddress, port, MsgTypes::PingMessage, MsgTypes::PongMessage);
-    Server.start();
-    bool flag = true;
-    std::thread thread(updateCircle, std::ref(Server), std::ref(flag));
-    std::string downloadPath;
-    std:: cin >> downloadPath;
+    setlocale(LC_ALL, "");
+
+    std::string localAddress, downloadsPath;
+    uint16_t port;
+    importSettings(localAddress, port, downloadsPath);
+    netlib::Node node(localAddress, port, downloadsPath);
+
     while (1) {
-        char command;
+        std::string command;
         std::cin >> command;
-        if (command == 'c') {
-            std::string host;
-            uint16_t conPort;
-            std::cin >> host >> conPort;
-            uint16_t id = Server.connectToHost(host, conPort);
-            auto *fileManager = new netlib::FileManager(MsgTypes::StartFile, MsgTypes::SendFile, MsgTypes::FinishFile, MsgTypes::SendFileEvent, downloadPath);
-            Server.addModule(id, fileManager);
-        } else if (command == 'm') {
-            uint16_t id;
-            std::string msgContent;
-            std::cin >> id >> msgContent;
-            netlib::Message<MsgTypes> msg(MsgTypes::StringMessage);
-            msg << msgContent;
-            Server.sendMessage(id, msg);
-        } else if (command == 'e') {
+        if (command == "connect") {
+            uint64_t inviteCode;
+            readHex(inviteCode);
+            node.addDirectConnection(inviteCode);
+        } else if (command == "exit") {
             break;
-        } else if (command == 'g') {
-            std::cout << Server.getRealEp() << "\n";
-        } else if (command == 'a') {
-            uint16_t id;
-            std::cin >> id;
-        } else if (command == 'f') {
-            uint16_t id;
-            std::string path;
-            std::string name;
-            std::cin >> id;
-            std::cin >> path >> name;
-            netlib::Message<MsgTypes> msg(MsgTypes::SendFileEvent);
-            msg << name << path << id;
-            Server.pushEvent(msg);
+        } else if (command == "invite") {
+            printHex(node.getInviteCode());
+            std::cout << "\n";
+        } else if (command == "download") {
+            std::string infoPath;
+            std::cin >> infoPath;
+            node.downloadFile(infoPath);
+        } else if (command == "upload") {
+            std::string filePath;
+            std::cin >> filePath;
+            node.uploadFile(filePath);
         }
     }
-    flag = false;
-    if (thread.joinable())
-        thread.join();
-    Server.stop();
+    node.stop();
     return 0;
 }
