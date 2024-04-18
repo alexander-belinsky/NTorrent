@@ -79,7 +79,7 @@ namespace netlib {
         }
 
         template<typename D>
-        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, D data) {
+        friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const D& data) {
             size_t prevSz = msg.m_body.size();
             msg.m_body.resize(prevSz + sizeof(D));
             std::memcpy(msg.m_body.data() + prevSz, &data, sizeof(D));
@@ -106,6 +106,7 @@ namespace netlib {
         std::shared_ptr<Session<T>> session_;
 
         OwnedMessage(std::shared_ptr<Session<T>> session, Message<T> msg) : msg_(msg), session_(session){
+
         }
     };
 }

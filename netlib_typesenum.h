@@ -3,7 +3,7 @@
 
 
 namespace netlib {
-    enum class TypesEnum: uint8_t {
+    enum class TypesEnum: uint16_t {
         Empty,
 
         PingMsgType,

@@ -91,6 +91,7 @@ namespace netlib {
         }
 
         void disconnectClient(uint16_t id) {
+            std::cout << "disconnectClient" << " " << id << "\n";
             if (m_sessionsMap.find(id) == m_sessionsMap.end())
                 return;
             std::shared_ptr<Session<T>> client = m_sessionsMap[id];
@@ -104,7 +105,7 @@ namespace netlib {
                 return;
             }
             std::shared_ptr<Session<T>> client = m_sessionsMap[id];
-            if (client && client->isConnected()) {
+            if (client && client->checkAble()) {
                 client->send(msg);
             }
             else {
@@ -129,13 +130,10 @@ namespace netlib {
 
     protected:
 
-        virtual void onMessage(OwnedMessage<T> &msg) {
+        virtual void onMessage(OwnedMessage<T> msg) {
 
         };
 
-        virtual void onDisconnect(std::shared_ptr<Session<T>> session) {
-
-        };
 
     protected:
         asio::io_context *m_context;

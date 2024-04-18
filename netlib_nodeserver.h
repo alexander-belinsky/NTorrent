@@ -11,7 +11,7 @@
 const uint16_t MAX_CONNECTIONS = 20;
 const std::string VERSION = "0.1b";
 const uint8_t MAX_TTL = 7;
-const uint32_t MAX_REQ_LIVE = 20;
+const uint32_t MAX_REQ_LIVE = 120;
 
 const uint16_t BETWEEN_REQ_TIME = 10;
 const uint32_t FILE_CHUNK_SIZE = 16384;
@@ -31,15 +31,11 @@ namespace netlib {
 
         void updateNode() {
             update();
-            for (const auto& session: m_sessionsMap) {
-                if (!session.second->checkAble()) {
-                    disconnectUser(session.second->getId());
-                }
-            }
         }
 
-        void onMessage(OwnedMessage<netlib::TypesEnum> &msg) override {
+        void onMessage(OwnedMessage<netlib::TypesEnum> msg) override {
             uint16_t id = msg.session_->getId();
+            std::cout << id << " " << (uint16_t )msg.msg_.m_header.id << "\n";
             if (checkConnectManager(msg.msg_)) {
                 updateConnectManager(msg.msg_, id);
                 return;
@@ -52,10 +48,6 @@ namespace netlib {
                 updateFileManager(msg.msg_, id);
                 return;
             }
-        }
-
-        void disconnectUser(uint16_t id) {
-            disconnectClient(id);
         }
 
         //================================== CONNECT =============================================
@@ -110,6 +102,10 @@ namespace netlib {
                 return;
             }
             uint16_t extId = m_sessionsMap.upper_bound(m_connectMap[id].lastId)->first;
+            if (extId == id) {
+                m_connectMap[id].lastId = extId;
+                responseNext(msg, id);
+            }
             m_connectMap[id].m_response = ConnectState::Wait;
             m_connectMap[id].lastId = extId;
             std::string address;
@@ -127,14 +123,17 @@ namespace netlib {
                         break;
                     std::string version;
                     msg >> version;
+                    std::cout << version << "\n";
                     if (version != VERSION) {
+                        std::cout << " doesn't match\n";
                         Message<TypesEnum> resp(TypesEnum::ConnectionResponseMsgType);
                         resp << false;
                         sendMessage(id, resp);
-                        disconnectUser(id);
+                        disconnectClient(id);
                     } else {
+                        std::cout << " match\n";
                         Message<TypesEnum> resp(TypesEnum::ConnectionResponseMsgType);
-                        resp << m_sessionsMap.size() << false;
+                        resp << m_sessionsMap.size() << true;
                         sendMessage(id, resp);
                         m_connectMap[id].m_response = ConnectState::Handshake;
                     }
@@ -149,7 +148,7 @@ namespace netlib {
                         msg >> m_connectMap[id].cntLeft;
                         requestNext(msg, id);
                     } else {
-                        disconnectUser(id);
+                        disconnectClient(id);
                     }
                     break;
                 }
@@ -336,6 +335,7 @@ namespace netlib {
         }
 
         void sendPathRequest(std::string &fileId) {
+            m_requestsMap[fileId].createdTime = clock();
             Message<TypesEnum> req(TypesEnum::PathRequestPushMsgType);
             req << MAX_TTL << fileId;
             for (const auto &session: m_sessionsMap) {

@@ -130,6 +130,11 @@ namespace netlib {
             mergePieces(m_filesInfo[fileId]);
         }
 
+        std::string getFileName(std::string &path)
+        {
+            return path.substr(path.find_last_of("/\\") + 1);
+        }
+
         void splitFile(std::string path, uint64_t pieceSize = 134217728) {
             if (!std::filesystem::exists(path))
                 return;
@@ -158,6 +163,8 @@ namespace netlib {
                 fout.write((std::to_string(buffer.size()) + "\n").c_str(), (std::to_string(buffer.size()) + "\n").size());
                 std::cout << "parsing file: " << i + 1 << "/" << numPieces << "\n";
             }
+            std::string fileName = getFileName(path);
+            fout.write(fileName.data(), fileName.size());
             std::cout << "FILE PARSED\n";
             fin.close();
             fout.close();
