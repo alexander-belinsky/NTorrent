@@ -49,14 +49,17 @@ namespace netlib {
         }
 
         void getAnswer() {
-            socket_.async_receive_from(asio::buffer(ansString_), ep_,
+            socket_.async_receive_from(asio::buffer(ansString_), tempEp_,
                                        [this](std::error_code er, size_t length) {
                                            if (!er) {
                                                if (!isRunning)
                                                    return;
-                                               std::string realHost = getIpFromBytes();
-                                               uint32_t realPort = getPortFromBytes();
-                                               realEp_ = asio::ip::udp::endpoint(asio::ip::address_v4::from_string(realHost), realPort);
+                                               if (tempEp_ == ep_) {
+                                                   std::string realHost = getIpFromBytes();
+                                                   uint32_t realPort = getPortFromBytes();
+                                                   realEp_ = asio::ip::udp::endpoint(
+                                                           asio::ip::address_v4::from_string(realHost), realPort);
+                                               }
                                                timer.expires_after(std::chrono::milliseconds(5000));
                                                timer.async_wait(
                                                        [this](asio::error_code ec) {
@@ -85,6 +88,8 @@ namespace netlib {
     private:
         asio::steady_timer timer;
         asio::ip::udp::endpoint ep_;
+        asio::ip::udp::endpoint tempEp_;
+
         asio::ip::udp::endpoint realEp_;
         asio::ip::udp::socket& socket_;
         asio::io_context* context_;

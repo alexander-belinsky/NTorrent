@@ -100,6 +100,7 @@ namespace netlib {
         }
 
         void sendMessage(uint16_t id, Message<T> &msg) {
+            //std:: cout << "sendMessage " << (uint16_t)msg.m_header.id << "\n";
             if (m_sessionsMap.find(id) == m_sessionsMap.end()) {
                 std::cout << "There is no such port!\n";
                 return;
@@ -130,7 +131,7 @@ namespace netlib {
 
     protected:
 
-        virtual void onMessage(OwnedMessage<T> msg) {
+        virtual void onMessage(OwnedMessage<T> &msg) {
 
         };
 

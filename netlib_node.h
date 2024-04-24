@@ -7,20 +7,23 @@
 
 namespace netlib {
 
-    void serverUpdateCircle(NodeServer &server, bool &isRunning) {
-        while (isRunning) {
-            server.updateNode();
-        }
-    }
-
     class Node {
 
     public:
+
+        static void serverUpdateCircle(NodeServer &server, bool &isRunning, asio::ip::udp::endpoint &ep, std::mutex &mutex) {
+            while (isRunning) {
+                std::scoped_lock lock(mutex);
+                ep = server.updateNode();
+            }
+        }
+
         Node(const std::string& localAddress, uint16_t port, std::string downloadPath):
         m_server(localAddress, port, std::move(downloadPath)){
             m_isRunning = true;
             m_server.start();
-            m_updateThread = std::thread(netlib::serverUpdateCircle, std::ref(m_server), std::ref(m_isRunning));
+            m_updateThread = std::thread(netlib::Node::serverUpdateCircle, std::ref(m_server), std::ref(m_isRunning),
+                                         std::ref(m_curEp), std::ref(mutex));
         }
 
         void stop() {
@@ -31,6 +34,7 @@ namespace netlib {
         }
 
         uint16_t addDirectConnection(asio::ip::udp::endpoint &ep) {
+            std::scoped_lock lock(mutex);
             return m_server.connect(ep);
         }
 
@@ -40,9 +44,8 @@ namespace netlib {
         }
 
         uint64_t getInviteCode() {
-            auto realEp = m_server.getRealEp();
-            std:: cout << realEp.address() << " " << realEp.port() << "\n";
-            return ((uint64_t)(realEp.address().to_v4().to_ulong()) << 16) + realEp.port();
+            std:: cout << m_curEp.address() << " " << m_curEp.port() << "\n";
+            return ((uint64_t)(m_curEp.address().to_v4().to_ulong()) << 16) + m_curEp.port();
         }
 
         static asio::ip::udp::endpoint epFromCode(uint64_t code) {
@@ -56,6 +59,7 @@ namespace netlib {
         }
 
         void downloadFile(std::string &path) {
+            std::scoped_lock lock(mutex);
             m_server.downloadFile(path);
         }
 
@@ -64,5 +68,8 @@ namespace netlib {
 
         bool m_isRunning;
         std::thread m_updateThread;
+
+        asio::ip::udp::endpoint m_curEp;
+        std::mutex mutex;
     };
 }

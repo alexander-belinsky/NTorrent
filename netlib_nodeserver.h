@@ -14,9 +14,10 @@ const uint8_t MAX_TTL = 7;
 const uint32_t MAX_REQ_LIVE = 120;
 
 const uint16_t BETWEEN_REQ_TIME = 10;
-const uint32_t FILE_CHUNK_SIZE = 16384;
+const uint32_t FILE_CHUNK_SIZE = 1024;
 
 namespace netlib {
+
     class NodeServer: public Server<TypesEnum> {
     public:
         NodeServer(const std::string& localAddress, uint16_t port, std::string downloadsPath) :
@@ -29,13 +30,13 @@ namespace netlib {
 
         //=================================GENERAL=====================================
 
-        void updateNode() {
+        asio::ip::udp::endpoint updateNode() {
             update();
+            return getRealEp();
         }
 
-        void onMessage(OwnedMessage<netlib::TypesEnum> msg) override {
+        void onMessage(OwnedMessage<netlib::TypesEnum> &msg) override {
             uint16_t id = msg.session_->getId();
-            std::cout << id << " " << (uint16_t )msg.msg_.m_header.id << "\n";
             if (checkConnectManager(msg.msg_)) {
                 updateConnectManager(msg.msg_, id);
                 return;
@@ -87,7 +88,7 @@ namespace netlib {
                 sendMessage(id, req);
                 return;
             }
-            Message<TypesEnum> req;
+            Message<TypesEnum> req(TypesEnum::NewConnectionRequestMsgType);
             req << getRealEp().address().to_string() << getRealEp().port() << true;
             m_connectMap[id].m_request = ConnectState::Wait;
             sendMessage(id, req);
@@ -102,9 +103,10 @@ namespace netlib {
                 return;
             }
             uint16_t extId = m_sessionsMap.upper_bound(m_connectMap[id].lastId)->first;
-            if (extId == id) {
+            if (extId == id || !m_sessionsMap[extId]->isActive()) {
                 m_connectMap[id].lastId = extId;
                 responseNext(msg, id);
+                return;
             }
             m_connectMap[id].m_response = ConnectState::Wait;
             m_connectMap[id].lastId = extId;
@@ -123,7 +125,7 @@ namespace netlib {
                         break;
                     std::string version;
                     msg >> version;
-                    std::cout << version << "\n";
+                    std::cout << version;
                     if (version != VERSION) {
                         std::cout << " doesn't match\n";
                         Message<TypesEnum> resp(TypesEnum::ConnectionResponseMsgType);
@@ -230,7 +232,8 @@ namespace netlib {
 
         static bool checkPathManager(Message<TypesEnum> &msg) {
             return msg.m_header.id == TypesEnum::PathRequestPushMsgType
-                    || msg.m_header.id == TypesEnum::PathResponsePullMsgType;
+                    || msg.m_header.id == TypesEnum::PathResponsePullMsgType
+                    || msg.m_header.id == TypesEnum::PathAddressPushMsgType;
         }
 
         bool checkTarget(Message<TypesEnum> &msg, uint16_t id) {
@@ -243,7 +246,7 @@ namespace netlib {
 
         void sendResponse(Message<TypesEnum> &msg, uint16_t id, const std::string& reqId) {
             Message<TypesEnum> resp(TypesEnum::PathResponsePullMsgType);
-            resp << getRealEp().address().to_string() << getRealEp().port() << reqId;
+            resp << getRealEp().address().to_string() << (uint16_t)getRealEp().port() << reqId;
             uint16_t reserved = reservePort();
             m_requestsMap[reqId].responseReservedId = reserved;
             m_requestsMap[reqId].fromResponseId = 0;
@@ -256,29 +259,33 @@ namespace netlib {
                     std::string reqId;
                     uint8_t TTL;
                     msg >> reqId >> TTL;
+                    std::cout << reqId << "\n";
 
                     if (m_requestsMap.find(reqId) == m_requestsMap.end() ||
                         clock() - m_requestsMap[reqId].createdTime >= MAX_REQ_LIVE * CLOCKS_PER_SEC) {
                         m_requestsMap[reqId].createdTime = clock();
                         m_requestsMap[reqId].fromRequestId = id;
 
+                        msg << TTL << reqId;
                         if (checkTarget(msg, id)) {
                             sendResponse(msg, id, reqId);
                             break;
                         }
 
                         TTL = std::max(MAX_TTL, TTL);
-                        TTL--;
-                        if (TTL <= 0)
+
+                        if (TTL <= 1)
                             return;
 
-                        msg << TTL << reqId;
-
-                        for (const auto& session: m_sessionsMap) {
-                            if (session.first == id)
+                        TTL--;
+                        std::vector<uint16_t> ids;
+                        for (auto& session: m_sessionsMap) {
+                            if (session.first == id || !session.second->isActive())
                                 continue;
-                            sendMessage(session.first, msg);
+                            ids.push_back(session.first);
                         }
+                        for (uint16_t id_: ids)
+                            sendMessage(id_, msg);
                     }
                     break;
                 }
@@ -297,9 +304,10 @@ namespace netlib {
 
                         std::string realAddress = getRealEp().address().to_string();
                         uint16_t realPort = getRealEp().port();
-                        connectToHost(address, port);
+                        uint16_t remoteId = connectToHost(address, port);
 
                         Message<TypesEnum> req(TypesEnum::PathAddressPushMsgType);
+                        fileReady(remoteId, reqId);
                         req << realAddress << realPort << reqId;
                         sendMessage(id, req);
                     } else {
@@ -322,8 +330,8 @@ namespace netlib {
                         uint16_t port;
                         msg >> port >> address;
 
-                        connectToHost(address, port, m_requestsMap[reqId].responseReservedId);
-                        sendBeginFile(id, reqId);
+                        uint16_t remoteId = connectToHost(address, port, m_requestsMap[reqId].responseReservedId);
+                        sendBeginFile(remoteId, reqId);
 
                     } else {
                         msg << reqId;
@@ -334,13 +342,19 @@ namespace netlib {
             }
         }
 
-        void sendPathRequest(std::string &fileId) {
+        void sendPathRequest(std::string& fileId) {
             m_requestsMap[fileId].createdTime = clock();
             Message<TypesEnum> req(TypesEnum::PathRequestPushMsgType);
             req << MAX_TTL << fileId;
-            for (const auto &session: m_sessionsMap) {
-                sendMessage(session.first, req);
+            std::vector<uint16_t> ids;
+            std::cout << "req" << " " << req.m_header.size << "\n";
+            for (auto& session: m_sessionsMap) {
+                if (!session.second->isConnected() || !session.second->isActive())
+                    continue;
+                ids.push_back(session.first);
             }
+            for (uint16_t id_: ids)
+                sendMessage(id_, req);
         }
 
         struct Request {
@@ -353,7 +367,12 @@ namespace netlib {
 
         //======================================FILE SENDING=================================
 
+        void fileReady(uint16_t userId, std::string &fileId) {
+            m_filesMap[userId][fileId].pieceNum = 0;
+        }
+
         void sendBeginFile(uint16_t userId, std::string &fileId) {
+            fileReady(userId, fileId);
             Message<TypesEnum> req(TypesEnum::FileBeginPullMsgType);
             req << fileId;
             sendMessage(userId, req);
@@ -363,6 +382,7 @@ namespace netlib {
             std::vector<TypesEnum> checkArray = {
                     TypesEnum::FileRequestMsgType, TypesEnum::FileBeginPullMsgType,
                     TypesEnum::FileBodyMsgType, TypesEnum::FileEndMsgType,
+                    TypesEnum::FileRequestEndMsgType, TypesEnum::FileBodyRespMsgType,
             };
 
             for (TypesEnum type: checkArray) {
@@ -389,36 +409,49 @@ namespace netlib {
             }
             else {
                 m_filesMap[id][fileId].pieceNum = pieceNum;
-                m_filesMap[id][fileId].fileStream.open(m_fileSystem.getPath(fileId, pieceNum), std::ios::in | std::ios::binary);
+                m_filesMap[id][fileId].fileStream.open(m_fileSystem.getPath(fileId, pieceNum), std::ios::out | std::ios::binary);
+                std::cout << "file: " << m_filesMap[id][fileId].fileStream.is_open() << "\n";
                 msg << pieceNum << fileId;
                 sendMessage(id, msg);
             }
         }
 
         void finishRequesting(uint16_t id, std::string &fileId) {
+            std::cout << "finishRequesting\n";
+            m_fileSystem.mergePieces(fileId);
             Message<TypesEnum> msg(TypesEnum::FileRequestEndMsgType);
             msg << fileId;
             sendMessage(id, msg);
         }
 
         void finishSending(uint16_t id, std::string &fileId) {
+            std::cout << "finishSending\n";
             Message<TypesEnum> msg(TypesEnum::FileEndMsgType);
             msg << fileId;
             sendMessage(id, msg);
         }
+
+        clock_t lastClock = 0;
 
         void nextBodyPiece(uint16_t id, std::string &fileId) {
             if (!m_filesMap[id][fileId].fileStream.is_open()) {
                 return;
             }
             uint32_t bytesLeft = m_filesMap[id][fileId].fileSize - m_filesMap[id][fileId].fileStream.tellg();
-            if (bytesLeft)
+            if (bytesLeft == 0) {
+                m_filesMap[id][fileId].fileStream.close();
                 finishSending(id, fileId);
-            else {
+            } else {
+                if (100 * (m_filesMap[id][fileId].fileSize - bytesLeft) / m_filesMap[id][fileId].fileSize !=
+                        100 * (m_filesMap[id][fileId].fileSize - bytesLeft - FILE_CHUNK_SIZE) / m_filesMap[id][fileId].fileSize) {
+                    std::cout << bytesLeft << " bytesLeft" << "\n";
+                    std::cout << FILE_CHUNK_SIZE / (clock() - lastClock) << "\n";
+                }
                 std::vector<char> buffer(std::min(bytesLeft, FILE_CHUNK_SIZE));
+                lastClock = clock();
                 m_filesMap[id][fileId].fileStream.read(buffer.data(), buffer.size());
                 Message<TypesEnum> msg(TypesEnum::FileBodyMsgType);
-                msg << buffer;
+                msg << buffer << fileId;
                 sendMessage(id, msg);
             }
         }
@@ -442,6 +475,7 @@ namespace netlib {
                         break;
                     uint16_t pieceNum;
                     msg >> pieceNum;
+                    std::cout << pieceNum << " pieceNum\n";
                     std::string path = m_fileSystem.getPath(fileId, pieceNum);
                     m_filesMap[id][fileId].fileSize = std::filesystem::file_size(path);
                     m_filesMap[id][fileId].fileStream.open(path, std::ios::binary | std::ios::in);
@@ -469,6 +503,9 @@ namespace netlib {
                     std::vector<char> vec;
                     msg >> vec;
                     m_filesMap[id][fileId].fileStream.write(vec.data(), vec.size());
+                    Message<TypesEnum> resp(TypesEnum::FileBodyRespMsgType);
+                    resp << fileId;
+                    sendMessage(id, resp);
                     break;
                 }
                 case TypesEnum::FileBodyRespMsgType: {
@@ -477,6 +514,7 @@ namespace netlib {
                     if (m_filesMap[id].find(fileId) == m_filesMap[id].end())
                         break;
                     nextBodyPiece(id, fileId);
+                    break;
                 }
                 case TypesEnum::FileRequestEndMsgType: {
                     std::string fileId;

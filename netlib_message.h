@@ -43,57 +43,81 @@ namespace netlib {
         }
 
         friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const std::string& data) {
-            std::vector<char> vec;
-            for (char c: data)
-                vec.push_back(c);
-            msg << vec;
-            return msg;
+            try {
+                std::vector<char> vec;
+                for (char c: data)
+                    vec.push_back(c);
+                msg << vec;
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
 
         friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, std::string& data) {
-            std::vector<char> vec;
-            msg >> vec;
-            data.clear();
-            for (char c: vec)
-                data.push_back(c);
-            return msg;
+            try {
+                std::vector<char> vec;
+                msg >> vec;
+                data.clear();
+                for (char c: vec)
+                    data.push_back(c);
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
 
         template<typename D>
         friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const std::vector<D>& data) {
-            uint32_t sz = data.size();
-            for (const D& item: data)
-                msg << item;
-            msg << sz;
-            return msg;
+            try {
+                uint32_t sz = data.size();
+                for (const D& item: data)
+                    msg << item;
+                msg << sz;
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
 
         template<typename D>
         friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, std::vector<D>& data) {
-            uint32_t sz;
-            msg >> sz;
-            data.resize(sz);
-            for (uint32_t i = 0; i < sz; i++)
-                msg >> data[sz - i - 1];
-            return msg;
+            try {
+                uint32_t sz;
+                msg >> sz;
+                data.resize(sz);
+                for (uint32_t i = 0; i < sz; i++)
+                    msg >> data[sz - i - 1];
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
 
         template<typename D>
         friend netlib::Message<T>& operator << (netlib::Message<T>& msg, const D& data) {
-            size_t prevSz = msg.m_body.size();
-            msg.m_body.resize(prevSz + sizeof(D));
-            std::memcpy(msg.m_body.data() + prevSz, &data, sizeof(D));
-            msg.m_header.size = msg.m_body.size();
-            return msg;
+            try {
+                size_t prevSz = msg.m_body.size();
+                msg.m_body.resize(prevSz + sizeof(D));
+                std::memcpy(msg.m_body.data() + prevSz, &data, sizeof(D));
+                msg.m_header.size = msg.m_body.size();
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
 
         template<typename D>
         friend netlib::Message<T>& operator >> (netlib::Message<T>& msg, D& data) {
-            size_t newSz = msg.m_body.size() - sizeof(D);
-            std::memcpy(&data, msg.m_body.data() + newSz, sizeof(D));
-            msg.m_body.resize(newSz);
-            msg.m_header.size = msg.m_body.size();
-            return msg;
+            try {
+                size_t newSz = msg.m_body.size() - sizeof(D);
+                std::memcpy(&data, msg.m_body.data() + newSz, sizeof(D));
+                msg.m_body.resize(newSz);
+                msg.m_header.size = msg.m_body.size();
+                return msg;
+            } catch (std::exception &exception) {
+                std::cout << exception.what() << "::: " << (uint16_t )msg.m_header.id << "\n";
+            }
         }
     };
 

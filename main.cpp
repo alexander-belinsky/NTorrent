@@ -2,7 +2,7 @@
 #include "ui/cui.h"
 #include <iostream>
 
-using namespace cui;
+using namespace netlib;
 
 void importSettings(std::string &localAddress, uint16_t  &port, std::string &downloadsPath) {
     std::ifstream fin("./.settings");
@@ -19,9 +19,8 @@ void printHex(uint64_t x) {
     std::cout << res;
 }
 
-void readHex(uint64_t &x) {
-    std::string s;
-    std::cin >> s;
+uint64_t fromHex(std::string s) {
+    uint64_t x;
     std::reverse(s.begin(), s.end());
     x = 0;
     uint64_t pow = 1;
@@ -33,6 +32,13 @@ void readHex(uint64_t &x) {
         }
         pow *= 16;
     }
+    return x;
+}
+
+void readHex(uint64_t &x) {
+    std::string s;
+    std::cin >> s;
+    x = fromHex(s);
 }
 
 int main() {
@@ -43,7 +49,6 @@ int main() {
     uint16_t port;
     importSettings(localAddress, port, downloadsPath);
     netlib::Node node(localAddress, port, downloadsPath);
-
     while (1) {
         std::string command;
         std::cin >> command;
