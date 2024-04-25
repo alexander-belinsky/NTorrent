@@ -8,13 +8,14 @@ std::string STUN_HOST = "stun.l.google.com";
 uint32_t STUN_PORT = 19302;
 
 uint16_t MAX_TIME_OUT = 20;
-uint16_t MAX_NO_ANSWER = 200;
+uint16_t MAX_NO_ANSWER = 100;
 
 uint32_t MAX_PACKET_SIZE = 1 << 15;
 
 uint16_t MAX_PACKET_ID = 17;
 
 namespace netlib {
+
     template<typename T>
     class Session : public std::enable_shared_from_this<Session<T>> {
 
@@ -22,15 +23,20 @@ namespace netlib {
         Session(asio::io_context *context, SafeQueue<OwnedMessage<T>> &queueIn, asio::ip::udp::socket &&socket, int id, T pongType) :
                 socket_(std::move(socket)), context_(context), queueIn_(queueIn),
                 stunSession_(STUN_HOST, STUN_PORT, context, socket_), pongType_(pongType), timer(*context_),
-                repeatTimer(*context), tcpSocket_(*context_, asio::ip::tcp::v4())  {
+                repeatTimer(*context)  {
             id_ = id;
             is_writing = false;
-            is_waiting = false;
 
             m_lastClock = clock();
         }
 
         virtual ~Session() = default;
+
+        enum class SessionType {
+            DefaultSession,
+            FileSession,
+        };
+        SessionType m_type = SessionType::DefaultSession;
 
         void sendNoAnswer(Message<T> &msg) {
             msg << false;
@@ -42,16 +48,22 @@ namespace netlib {
         }
 
         void send(Message<T> &msg) {
+            currentId++;
+            msg << currentId;
             msg << true;
             queueOut_.push_back(msg);
-            if (!is_writing && !is_waiting && m_isConnected) {
+            if (!is_writing && m_isConnected) {
+                m_lastPongResp = clock();
                 writeHeader();
             }
             bool f;
             msg >> f;
+            msg >> currentId;
         }
 
         void disconnect() {
+            if (!socket_.is_open())
+                return;
             std::cerr << "Disconnected\n";
             socket_.close();
         };
@@ -59,7 +71,7 @@ namespace netlib {
         void startStunSession() {
             asio::post(*context_,
                        [this]() {
-                           stunSession_.sendRequest();
+                           stunSession_.start();
                        }
             );
         }
@@ -70,7 +82,7 @@ namespace netlib {
         }
 
         bool isConnected() const {
-            return socket_.is_open() || tcpSocket_.is_open();
+            return socket_.is_open();
         }
 
         bool isActive() {
@@ -102,7 +114,7 @@ namespace netlib {
         }
 
         void ping(T pingType) {
-            if (!is_writing && !is_waiting) {
+            if (!is_writing) {
                 pingType_ = pingType;
                 Message<T> msg(pingType_);
                 sendNoAnswer(msg);
@@ -112,14 +124,19 @@ namespace netlib {
             shouldPing = true;
         }
 
-        void pong() {
+        void pong(uint16_t msgId) {
+            Message<T> msg(pongType_);
+            msg << msgId;
+            sendNoAnswer(msg);
+        }
+
+        void tryPong(uint16_t msgId) {
+            std::cout << "tryPong\n";
             if (!is_writing) {
-                Message<T> msg(pongType_);
-                sendNoAnswer(msg);
-                shouldPong = false;
+                pong(msgId);
                 return;
             }
-            shouldPong = true;
+            m_pongIds.push_back(msgId);
         }
 
         void startListening() {
@@ -149,20 +166,24 @@ namespace netlib {
         void endOfWriting() {
             bool shouldWait;
             tempMsgOut_ >> shouldWait;
+            uint16_t msgId;
+            tempMsgOut_ >> msgId;
+            tempMsgOut_ << msgId;
             tempMsgOut_ << shouldWait;
-            //std::cout << "endOfWriting " << (uint16_t)tempMsgOut_.m_header.id << "\n";
+            std::cout << "endOfWriting " << (uint16_t)tempMsgOut_.m_header.id << " " << msgId << "\n";
             is_writing = false;
-            if (shouldPong)
-                pong();
+            while (!m_pongIds.empty()) {
+                pong(m_pongIds.pop_front());
+            }
+            m_pongIds.clear();
             if (shouldWait) {
-                is_waiting = true;
-                m_isWaitingClock = clock();
-                repeatTimer.expires_after(std::chrono::milliseconds(MAX_NO_ANSWER + 10));
-                repeatTimer.async_wait([this](std::error_code ec) {
-                    repeatMessage();
-                });
+                if (msgId == lastSentId + 1) {
+                    lastSentId++;
+                    m_latestMsg.push_back(tempMsgOut_);
+                }
+                checkRepeat();
             } else {
-                if (shouldPing && !is_waiting)
+                if (shouldPing)
                     ping(pingType_);
                 if (queueOut_.empty() || !m_isConnected)
                     is_writing = false;
@@ -174,31 +195,43 @@ namespace netlib {
         void endOfReading() {
             bool shouldAnswer;
             tempMsgIn_ >> shouldAnswer;
-            //std::cout << "endOfReading " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
+            std::cout << "endOfReading " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
             m_lastClock = clock();
-            if (!m_isConnected) {
-                tcpSocketConnect();
-            }
+            if (!m_isConnected)
+                m_lastPongResp = clock();
             m_isConnected = true;
             if (tempMsgIn_.m_header.id == pongType_) {
-                is_waiting = false;
+                uint16_t pongMsgId;
+                tempMsgIn_ >> pongMsgId;
+                std::cout << "pongId: " << pongMsgId << "\n";
+                if (pongMsgId >= lastSentId - m_latestMsg.size())
+                    m_lastPongResp = clock();
+                for (int i = pongMsgId; i + m_latestMsg.size() <= lastSentId; i++) {
+                    m_latestMsg.pop_front();
+                }
             }
             else {
-                if (shouldAnswer) {
-                    pong();
+                if (tempMsgIn_.m_header.id != pingType_) {
+                    uint16_t msgId;
+                    tempMsgIn_ >> msgId;
+                    if (shouldAnswer && msgId <= lastGotId + 1)
+                        tryPong(msgId);
+                    if (msgId == lastGotId + 1) {
+                        queueIn_.push_back({this->shared_from_this(), tempMsgIn_});
+                        lastGotId++;
+                    }
                 }
-                queueIn_.push_back({this->shared_from_this(), tempMsgIn_});
             }
             tempMsgIn_.clear();
             readHeader();
-            if (!is_writing && !is_waiting && !queueOut_.empty())
+            if (!is_writing && !queueOut_.empty())
                 writeHeader();
         }
 
         void writeHeader() {
             is_writing = true;
             tempMsgOut_ = queueOut_.pop_front();
-            //std::cout << "writeHeader " << (uint16_t )tempMsgOut_.m_header.id << " " << tempMsgOut_.m_body.size() << "\n";
+            std::cout << "writeHeader " << (uint16_t )tempMsgOut_.m_header.id << " " << tempMsgOut_.m_body.size() << "\n";
             socket_.async_send(asio::buffer(&tempMsgOut_.m_header, sizeof(MessageHeader<T>)),
                                [this] (std::error_code er, size_t length) {
                                    if (!er) {
@@ -210,6 +243,7 @@ namespace netlib {
                                        }
                                    }
                                    else {
+                                       std::cout << "writeHeader error:" << er.message() << "\n";
                                        disconnect();
                                    }
                                }
@@ -223,6 +257,7 @@ namespace netlib {
                                        endOfWriting();
                                    }
                                    else {
+                                       std::cout << "writeBody error:" << er.message() << "\n";
                                        disconnect();
                                    }
                                }
@@ -230,7 +265,7 @@ namespace netlib {
         }
 
         void readHeader() {
-            socket_.async_receive_from(asio::buffer(&tempMsgIn_.m_header, sizeof(MessageHeader<T>) + 1), tempEp_,
+            socket_.async_receive_from(asio::buffer(&tempMsgIn_.m_header, sizeof(MessageHeader<T>)), tempEp_,
                                   [this] (std::error_code er, size_t length) {
                                       if (!er) {
                                           if (!m_isConnected && tempEp_.address() == remoteEp_.address())
@@ -245,7 +280,7 @@ namespace netlib {
                                               readHeader();
                                               return;
                                           }
-                                          //std::cout << "readHeader " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
+                                          std::cout << "readHeader " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
                                           if (tempMsgIn_.m_header.size > 0) {
                                               tempMsgIn_.m_body.resize(tempMsgIn_.m_header.size);
                                               readBody();
@@ -255,6 +290,7 @@ namespace netlib {
                                           }
                                       }
                                       else {
+                                          std::cout << "readHeader error:" << er.message() << "\n";
                                           disconnect();
                                       }
                                   }
@@ -277,19 +313,18 @@ namespace netlib {
                                           endOfReading();
                                       }
                                       else {
+                                          std::cout << "readBody error:" << er.message() << "\n";
                                           disconnect();
                                       }
                                   }
             );
         }
 
-        void repeatMessage() {
-            //std::cout << "try repeat " << (uint16_t) tempMsgOut_.m_header.id << " " << m_isConnected << is_writing << is_waiting << " " << clock() - m_isWaitingClock << "\n";
-            if (m_isConnected && !is_writing && is_waiting && (clock() - m_isWaitingClock > MAX_NO_ANSWER)) {
-                queueOut_.push_front(tempMsgOut_);
-                is_waiting = false;
-                std::cout << "repeat " << (uint16_t) tempMsgOut_.m_header.id << "\n";
-                writeHeader();
+        void checkRepeat() {
+            if (m_isConnected && (clock() - m_lastPongResp > MAX_NO_ANSWER) && !m_latestMsg.empty()) {
+                //std::cout << "checkRepeat::repeat\n";
+                m_lastPongResp = clock();
+                queueOut_.push_front(m_latestMsg.front());
             }
         }
 
@@ -302,7 +337,7 @@ namespace netlib {
                                 disconnect();
                                 return;
                             }
-                            if (queueOut_.empty() || !m_isConnected && !is_waiting)
+                            if (queueOut_.empty() || !m_isConnected)
                                 ping(pingType_);
                             pingCycle();
                         } else {
@@ -312,28 +347,25 @@ namespace netlib {
             );
         };
 
-        void tcpSocketConnect() {
-            is_writing = true;
-            auto localEp = (asio::ip::basic_endpoint<asio::ip::tcp>)socket_.local_endpoint();
-            socket_.close();
-            tcpSocket_.bind(localEp);
-            tcpSocket_.connect((asio::ip::basic_endpoint<asio::ip::tcp>) remoteEp_);
-        }
-
     private:
         asio::ip::udp::socket socket_;
-        asio::ip::tcp::socket tcpSocket_;
         asio::io_context *context_;
         StunSession stunSession_;
         SafeQueue<Message<T>> queueOut_;
         Message<T> tempMsgOut_;
         SafeQueue<OwnedMessage<T>> &queueIn_;
         Message<T> tempMsgIn_;
+
+        SafeQueue<Message<T>> m_latestMsg;
+        uint16_t lastSentId = 0;
+        uint16_t lastGotId = 0;
+        uint16_t currentId = 0;
+
+        SafeQueue<uint16_t> m_pongIds;
+
         std::mutex mutex_;
         bool is_writing = false;
-        bool is_waiting = false;
 
-        bool shouldPong = false;
         bool shouldPing = false;
 
         uint16_t id_;
@@ -345,7 +377,7 @@ namespace netlib {
 
         bool m_isConnected = false;
         std::clock_t m_lastClock = 0;
-        std::clock_t m_isWaitingClock = 0;
+        std::clock_t m_lastPongResp = 0;
 
         asio::ip::udp::endpoint remoteEp_;
         asio::ip::udp::endpoint tempEp_;

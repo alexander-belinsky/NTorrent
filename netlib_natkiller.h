@@ -81,6 +81,18 @@ namespace netlib {
             return realEp_;
         }
 
+        void start() {
+            socket_.send_to(asio::buffer(reqString_.data(), reqString_.size()), ep_);
+            socket_.receive_from(asio::buffer(ansString_), tempEp_);
+            if (tempEp_ == ep_) {
+                std::string realHost = getIpFromBytes();
+                uint32_t realPort = getPortFromBytes();
+                realEp_ = asio::ip::udp::endpoint(
+                        asio::ip::address_v4::from_string(realHost), realPort);
+            }
+            sendRequest();
+        }
+
         void stop() {
             isRunning = false;
         }
