@@ -25,7 +25,7 @@ namespace netlib {
         void start() {
             m_idleWork = new asio::io_context::work(*m_context);
             m_contextThread = std::thread([this]() {m_context->run();});
-            std::cout << "[SERVER] Started" << "\n";
+            std::cout << "[NODE] Started" << "\n";
             prepareSession();
         }
 
@@ -36,7 +36,7 @@ namespace netlib {
 
             delete m_context;
             
-            std::cout << "[SERVER] Stopped\n";
+            std::cout << "[NODE] Stopped\n";
         }
 
         void prepareSession() {
@@ -81,7 +81,7 @@ namespace netlib {
             if (m_sessionsMap.find(m_curId) == m_sessionsMap.end())
                 prepareSession();
             m_sessionsMap[id]->connectWithEndpoint(*iter, m_pingType);
-            std::cout << "[SERVER]: New UDP connection to " << (*iter).endpoint() << " created on port " << id << "\n";
+            std::cout << "[NODE]: New UDP connection to " << (*iter).endpoint() << " created on port " << id << "\n";
             return id;
         }
 
@@ -100,7 +100,7 @@ namespace netlib {
         }
 
         void sendMessage(uint16_t id, Message<T> &msg) {
-            std:: cout << "sendMessage " << (uint16_t)msg.m_header.id << "\n";
+            //std:: cout << "sendMessage " << (uint16_t)msg.m_header.id << "\n";
             if (m_sessionsMap.find(id) == m_sessionsMap.end()) {
                 std::cout << "There is no such port!\n";
                 return;

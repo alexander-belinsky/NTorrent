@@ -11,12 +11,12 @@ namespace netlib {
 
         virtual ~SafeQueue() { clear(); }
 
-        T front() {
+        T &front() {
             std::scoped_lock lock(mutex_);
             return deque_.front();
         }
 
-        T back() {
+        T &back() {
             std::scoped_lock lock(mutex_);
             return deque_.back();
         }

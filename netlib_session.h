@@ -8,7 +8,7 @@ std::string STUN_HOST = "stun.l.google.com";
 uint32_t STUN_PORT = 19302;
 
 uint16_t MAX_TIME_OUT = 20;
-uint16_t MAX_NO_ANSWER = 100;
+uint16_t MAX_NO_ANSWER = 200;
 
 uint32_t MAX_PACKET_SIZE = 1 << 15;
 
@@ -53,7 +53,6 @@ namespace netlib {
             msg << true;
             queueOut_.push_back(msg);
             if (!is_writing && m_isConnected) {
-                m_lastPongResp = clock();
                 writeHeader();
             }
             bool f;
@@ -69,11 +68,7 @@ namespace netlib {
         };
 
         void startStunSession() {
-            asio::post(*context_,
-                       [this]() {
-                           stunSession_.start();
-                       }
-            );
+            stunSession_.start();
         }
 
         void asyncDisconnect() {
@@ -128,15 +123,16 @@ namespace netlib {
             Message<T> msg(pongType_);
             msg << msgId;
             sendNoAnswer(msg);
+            shouldPong = false;
         }
 
         void tryPong(uint16_t msgId) {
-            std::cout << "tryPong\n";
             if (!is_writing) {
-                pong(msgId);
+                pong(std::max(msgId, m_maxPong));
                 return;
             }
-            m_pongIds.push_back(msgId);
+            m_maxPong = std::max(msgId, m_maxPong);
+            shouldPong = true;
         }
 
         void startListening() {
@@ -170,24 +166,19 @@ namespace netlib {
             tempMsgOut_ >> msgId;
             tempMsgOut_ << msgId;
             tempMsgOut_ << shouldWait;
-            std::cout << "endOfWriting " << (uint16_t)tempMsgOut_.m_header.id << " " << msgId << "\n";
+            //std::cout << "endOfWriting " << (uint16_t)tempMsgOut_.m_header.id << " " << msgId << "\n";
             is_writing = false;
-            while (!m_pongIds.empty()) {
-                pong(m_pongIds.pop_front());
-            }
-            m_pongIds.clear();
+            if (shouldPong)
+                pong(m_maxPong);
             if (shouldWait) {
                 if (msgId == lastSentId + 1) {
                     lastSentId++;
-                    m_latestMsg.push_back(tempMsgOut_);
+                    m_latestMsg.push_back({tempMsgOut_, (uint64_t)clock()});
                 }
-                checkRepeat();
             } else {
                 if (shouldPing)
                     ping(pingType_);
-                if (queueOut_.empty() || !m_isConnected)
-                    is_writing = false;
-                else
+                if (!queueOut_.empty() && m_isConnected)
                     writeHeader();
             }
         }
@@ -195,18 +186,17 @@ namespace netlib {
         void endOfReading() {
             bool shouldAnswer;
             tempMsgIn_ >> shouldAnswer;
-            std::cout << "endOfReading " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
+            //std::cout << "endOfReading " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
             m_lastClock = clock();
-            if (!m_isConnected)
-                m_lastPongResp = clock();
+            if (!m_isConnected) {
+                checkRepeat();
+            }
             m_isConnected = true;
             if (tempMsgIn_.m_header.id == pongType_) {
                 uint16_t pongMsgId;
                 tempMsgIn_ >> pongMsgId;
-                std::cout << "pongId: " << pongMsgId << "\n";
-                if (pongMsgId >= lastSentId - m_latestMsg.size())
-                    m_lastPongResp = clock();
-                for (int i = pongMsgId; i + m_latestMsg.size() <= lastSentId; i++) {
+                //std::cout << "pongId: " << pongMsgId << "\n";
+                while (pongMsgId + m_latestMsg.size() > lastSentId) {
                     m_latestMsg.pop_front();
                 }
             }
@@ -214,24 +204,40 @@ namespace netlib {
                 if (tempMsgIn_.m_header.id != pingType_) {
                     uint16_t msgId;
                     tempMsgIn_ >> msgId;
-                    if (shouldAnswer && msgId <= lastGotId + 1)
+                    //std::cout << "msgId: " << msgId << "\n";
+                    if (shouldAnswer && msgId <= lastGotId + 1) {
                         tryPong(msgId);
-                    if (msgId == lastGotId + 1) {
-                        queueIn_.push_back({this->shared_from_this(), tempMsgIn_});
-                        lastGotId++;
                     }
+                    if (msgId >= lastGotId + 1) {
+                        m_futureMsgMap[msgId] = tempMsgIn_;
+                    } else {
+                        //std::cout << "! skipped message\n";
+                    }
+                    uint16_t delta = 0;
+                    while (m_futureMsgMap.find(lastGotId + 1) != m_futureMsgMap.end()) {
+                        queueIn_.push_back({this->shared_from_this(), m_futureMsgMap[lastGotId + 1]});
+                        m_futureMsgMap.erase(lastGotId + 1);
+                        lastGotId++;
+                        delta++;
+                    }
+                    if (delta > 1)
+                        tryPong(lastGotId);
                 }
             }
             tempMsgIn_.clear();
-            readHeader();
+            if (!is_writing) {
+                if (shouldPong)
+                    pong(m_maxPong);
+            }
             if (!is_writing && !queueOut_.empty())
                 writeHeader();
+            readHeader();
         }
 
         void writeHeader() {
             is_writing = true;
             tempMsgOut_ = queueOut_.pop_front();
-            std::cout << "writeHeader " << (uint16_t )tempMsgOut_.m_header.id << " " << tempMsgOut_.m_body.size() << "\n";
+            //std::cout << "writeHeader " << (uint16_t )tempMsgOut_.m_header.id << " " << tempMsgOut_.m_body.size() << "\n";
             socket_.async_send(asio::buffer(&tempMsgOut_.m_header, sizeof(MessageHeader<T>)),
                                [this] (std::error_code er, size_t length) {
                                    if (!er) {
@@ -243,7 +249,6 @@ namespace netlib {
                                        }
                                    }
                                    else {
-                                       std::cout << "writeHeader error:" << er.message() << "\n";
                                        disconnect();
                                    }
                                }
@@ -251,13 +256,13 @@ namespace netlib {
         }
 
         void writeBody() {
+            //std::cout << "writeBody " << (uint16_t )tempMsgOut_.m_header.id << " " << tempMsgOut_.m_body.size() << "\n";
             socket_.async_send(asio::buffer(tempMsgOut_.m_body.data(), tempMsgOut_.m_body.size()),
                                [this] (std::error_code er, size_t length) {
                                    if (!er) {
                                        endOfWriting();
                                    }
                                    else {
-                                       std::cout << "writeBody error:" << er.message() << "\n";
                                        disconnect();
                                    }
                                }
@@ -280,7 +285,7 @@ namespace netlib {
                                               readHeader();
                                               return;
                                           }
-                                          std::cout << "readHeader " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
+                                          //std::cout << "readHeader " << (uint16_t)tempMsgIn_.m_header.id << " " << tempMsgIn_.m_header.size << "\n";
                                           if (tempMsgIn_.m_header.size > 0) {
                                               tempMsgIn_.m_body.resize(tempMsgIn_.m_header.size);
                                               readBody();
@@ -290,7 +295,6 @@ namespace netlib {
                                           }
                                       }
                                       else {
-                                          std::cout << "readHeader error:" << er.message() << "\n";
                                           disconnect();
                                       }
                                   }
@@ -306,14 +310,13 @@ namespace netlib {
                                               return;
                                           }
                                           if (length != tempMsgIn_.m_body.size()) {
-                                              std::cout << length << " <- not ness " << (uint16_t)tempMsgIn_.m_header.id << "\n";
+                                              //std::cout << length << " <- not ness " << (uint16_t)tempMsgIn_.m_header.id << "\n";
                                               readHeader();
                                               return;
                                           }
                                           endOfReading();
                                       }
                                       else {
-                                          std::cout << "readBody error:" << er.message() << "\n";
                                           disconnect();
                                       }
                                   }
@@ -321,11 +324,15 @@ namespace netlib {
         }
 
         void checkRepeat() {
-            if (m_isConnected && (clock() - m_lastPongResp > MAX_NO_ANSWER) && !m_latestMsg.empty()) {
-                //std::cout << "checkRepeat::repeat\n";
-                m_lastPongResp = clock();
-                queueOut_.push_front(m_latestMsg.front());
-            }
+            repeatTimer.expires_after(std::chrono::milliseconds(MAX_NO_ANSWER));
+            repeatTimer.async_wait(
+                    [this](std::error_code ec) {
+                        if (m_isConnected && !m_latestMsg.empty() && clock() > MAX_NO_ANSWER + m_latestMsg.front().time) {
+                            m_latestMsg.front().time = clock();
+                            queueOut_.push_front(m_latestMsg.front().msg);
+                        }
+                        checkRepeat();
+            });
         }
 
         void pingCycle() {
@@ -339,12 +346,22 @@ namespace netlib {
                             }
                             if (queueOut_.empty() || !m_isConnected)
                                 ping(pingType_);
+                            if (!is_writing)
+                                checkRepeat();
                             pingCycle();
                         } else {
                             std::cerr << "Waiting error: " << ec.message() << "\n";
                         }
                     }
             );
+        };
+
+        struct MemMsg {
+            Message<T> msg;
+            uint64_t time;
+            MemMsg(Message<T> m, uint64_t t): msg(m){
+                time = t;
+            }
         };
 
     private:
@@ -356,7 +373,7 @@ namespace netlib {
         SafeQueue<OwnedMessage<T>> &queueIn_;
         Message<T> tempMsgIn_;
 
-        SafeQueue<Message<T>> m_latestMsg;
+        SafeQueue<MemMsg> m_latestMsg;
         uint16_t lastSentId = 0;
         uint16_t lastGotId = 0;
         uint16_t currentId = 0;
@@ -366,6 +383,8 @@ namespace netlib {
         std::mutex mutex_;
         bool is_writing = false;
 
+        bool shouldPong = false;
+        uint16_t m_maxPong = 0;
         bool shouldPing = false;
 
         uint16_t id_;
@@ -377,9 +396,10 @@ namespace netlib {
 
         bool m_isConnected = false;
         std::clock_t m_lastClock = 0;
-        std::clock_t m_lastPongResp = 0;
 
         asio::ip::udp::endpoint remoteEp_;
         asio::ip::udp::endpoint tempEp_;
+
+        std::map<uint16_t, Message<T>> m_futureMsgMap;
     };
 }

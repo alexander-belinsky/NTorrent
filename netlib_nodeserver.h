@@ -15,6 +15,7 @@ const uint32_t MAX_REQ_LIVE = 600;
 
 const uint16_t BETWEEN_REQ_TIME = 10;
 const uint32_t FILE_CHUNK_SIZE = 1024;
+const uint16_t FILE_PACK_NUM = 128;
 
 namespace netlib {
 
@@ -137,15 +138,14 @@ namespace netlib {
                         break;
                     std::string version;
                     msg >> version;
-                    std::cout << version;
                     if (version != VERSION) {
-                        std::cout << " doesn't match\n";
+                        std::cout << "[CONNECTOR]: Version doesn't match\n";
                         Message<TypesEnum> resp(TypesEnum::ConnectionResponseMsgType);
                         resp << false;
                         sendMessage(id, resp);
                         disconnectClient(id);
                     } else {
-                        std::cout << " match\n";
+                        std::cout << "[CONNECTOR]: The connection is formed\n";
                         Message<TypesEnum> resp(TypesEnum::ConnectionResponseMsgType);
                         resp << getDefaultCnt() << true;
                         sendMessage(id, resp);
@@ -281,7 +281,6 @@ namespace netlib {
                     uint8_t TTL;
                     std::string fileId;
                     msg >> reqId >> TTL >> fileId;
-                    std::cout << fileId << " " << reqId << "\n";
 
                     if (m_requestsMap.find(reqId) == m_requestsMap.end() ||
                         clock() - m_requestsMap[reqId].createdTime >= MAX_REQ_LIVE * CLOCKS_PER_SEC) {
@@ -290,6 +289,7 @@ namespace netlib {
 
                         msg << fileId << TTL << reqId;
                         if (checkTarget(fileId)) {
+
                             sendResponse(id, reqId, fileId);
                             break;
                         }
@@ -333,7 +333,6 @@ namespace netlib {
                         m_sessionsMap[remoteId]->m_type = Session<TypesEnum>::SessionType::FileSession;
 
                         Message<TypesEnum> req(TypesEnum::PathAddressPushMsgType);
-                        std::cout << m_requestsMap[reqId].fileId << "<-fileId\n";
                         fileReady(remoteId, m_requestsMap[reqId].fileId);
                         req << realAddress << realPort << respId;
                         sendMessage(id, req);
@@ -360,7 +359,6 @@ namespace netlib {
 
                         uint16_t remoteId = connectToHost(address, port, m_requestsMap[respId].responseReservedId);
                         m_sessionsMap[remoteId]->m_type = Session<TypesEnum>::SessionType::FileSession;
-                        std::cout << m_requestsMap[respId].fileId << "<-fileId\n";
                         sendBeginFile(remoteId, m_requestsMap[respId].fileId);
 
                     } else {
@@ -444,14 +442,13 @@ namespace netlib {
             else {
                 m_filesMap[id][fileId].pieceNum = pieceNum;
                 m_filesMap[id][fileId].fileStream.open(m_fileSystem.getPath(fileId, pieceNum), std::ios::out | std::ios::binary);
-                std::cout << "file: " << m_filesMap[id][fileId].fileStream.is_open() << "\n";
                 msg << pieceNum << fileId;
                 sendMessage(id, msg);
             }
         }
 
         void finishRequesting(uint16_t id, std::string &fileId) {
-            std::cout << "finishRequesting\n";
+            std::cout << "[FILE-SENDER]: Finish requesting\n";
             m_filesMap[id].erase(fileId);
             Message<TypesEnum> msg(TypesEnum::FileRequestEndMsgType);
             msg << fileId;
@@ -459,13 +456,11 @@ namespace netlib {
         }
 
         void finishSending(uint16_t id, std::string &fileId) {
-            std::cout << "finishSending\n";
+            std::cout << "[FILE-SENDER]: Finish sending\n";
             Message<TypesEnum> msg(TypesEnum::FileEndMsgType);
             msg << fileId;
             sendMessage(id, msg);
         }
-
-        clock_t lastClock = 0;
 
         void nextBodyPiece(uint16_t id, std::string &fileId) {
             if (!m_filesMap[id][fileId].fileStream.is_open()) {
@@ -476,13 +471,7 @@ namespace netlib {
                 m_filesMap[id][fileId].fileStream.close();
                 finishSending(id, fileId);
             } else {
-                if (100 * (m_filesMap[id][fileId].fileSize - bytesLeft) / m_filesMap[id][fileId].fileSize !=
-                        100 * (m_filesMap[id][fileId].fileSize - bytesLeft - FILE_CHUNK_SIZE) / m_filesMap[id][fileId].fileSize) {
-                    std::cout << bytesLeft << " bytesLeft" << "\n";
-                    std::cout << FILE_CHUNK_SIZE / (clock() - lastClock) << "\n";
-                }
                 std::vector<char> buffer(std::min(bytesLeft, FILE_CHUNK_SIZE));
-                lastClock = clock();
                 m_filesMap[id][fileId].fileStream.read(buffer.data(), buffer.size());
                 Message<TypesEnum> msg(TypesEnum::FileBodyMsgType);
                 msg << buffer << fileId;
@@ -509,11 +498,15 @@ namespace netlib {
                         break;
                     uint16_t pieceNum;
                     msg >> pieceNum;
-                    std::cout << pieceNum << " pieceNum\n";
+                    std::cout << "[FILE-SENDER]: New piece with number " << pieceNum << "\n";
                     std::string path = m_fileSystem.getPath(fileId, pieceNum);
                     m_filesMap[id][fileId].fileSize = std::filesystem::file_size(path);
                     m_filesMap[id][fileId].fileStream.open(path, std::ios::binary | std::ios::in);
-                    nextBodyPiece(id, fileId);
+                    for (int i = 0; i < FILE_PACK_NUM; i++) {
+                        nextBodyPiece(id, fileId);
+                        if (!m_filesMap[id][fileId].fileStream.is_open())
+                            break;
+                    }
                     break;
                 }
                 case TypesEnum::FileEndMsgType: {
@@ -523,6 +516,7 @@ namespace netlib {
                         break;
                     m_filesMap[id][fileId].fileStream.close();
                     m_fileSystem.addPiece(fileId, m_filesMap[id][fileId].pieceNum);
+                    std::cout << "[FILE-RECEIVER]: " << "New piece number " << m_filesMap[id][fileId].pieceNum << " got\n";
                     requestNextPiece(id, fileId);
                     break;
                 }
@@ -537,9 +531,13 @@ namespace netlib {
                     std::vector<char> vec;
                     msg >> vec;
                     m_filesMap[id][fileId].fileStream.write(vec.data(), vec.size());
-                    Message<TypesEnum> resp(TypesEnum::FileBodyRespMsgType);
-                    resp << fileId;
-                    sendMessage(id, resp);
+                    currentPackNum++;
+                    if (currentPackNum == FILE_PACK_NUM) {
+                        currentPackNum = 0;
+                        Message<TypesEnum> resp(TypesEnum::FileBodyRespMsgType);
+                        resp << fileId;
+                        sendMessage(id, resp);
+                    }
                     break;
                 }
                 case TypesEnum::FileBodyRespMsgType: {
@@ -547,7 +545,11 @@ namespace netlib {
                     msg >> fileId;
                     if (m_filesMap[id].find(fileId) == m_filesMap[id].end())
                         break;
-                    nextBodyPiece(id, fileId);
+                    for (int i = 0; i < FILE_PACK_NUM; i++) {
+                        nextBodyPiece(id, fileId);
+                        if (!m_filesMap[id][fileId].fileStream.is_open())
+                            break;
+                    }
                     break;
                 }
                 case TypesEnum::FileRequestEndMsgType: {
@@ -575,7 +577,8 @@ namespace netlib {
 
         void downloadFile(std::string &infoPath) {
             std::string fileId = m_fileSystem.addFile(infoPath);
-            sendPathRequest(fileId);
+            if (!fileId.empty())
+                sendPathRequest(fileId);
         }
 
     private:
@@ -594,5 +597,7 @@ namespace netlib {
         FileSystem m_fileSystem;
 
         std::mt19937 rnd;
+
+        uint16_t currentPackNum = 0;
     };
 }

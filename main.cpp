@@ -41,10 +41,41 @@ void readHex(uint64_t &x) {
     x = fromHex(s);
 }
 
+void welcomeScreen() {
+    std::cout << "        _      __        __                             __             __    __      \n"
+                 "       | | /| / / ___   / / ____ ___   __ _  ___       / /_ ___       / /_  / /  ___ \n"
+                 "       | |/ |/ / / -_) / / / __// _ \\ /  ' \\/ -_)     / __// _ \\     / __/ / _ \\/ -_)\n"
+                 "       |__/|__/  \\__/ /_/  \\__/ \\___//_/_/_/\\__/      \\__/ \\___/     \\__/ /_//_/\\__/ \n"
+                 "                   ____                                _  __       __                \n"
+                 "                  / __/ __ __   ___  ___   ____       / |/ / ___  / /_               \n"
+                 "                 _\\ \\  / // /  / _ \\/ -_) / __/      /    / / -_)/ __/               \n"
+                 "                /___/  \\_,_/  / .__/\\__/ /_/        /_/|_/  \\__/ \\__/                \n"
+                 "                             /_/                                                     \n\n";
+    std::cout << "This net can be used to share files.\n";
+    std::cout << "If you need some help try command help.\n";
+    std::cout << "If you dont know how to use this net try command info.\n";
+}
+
+void informationScreen() {
+    std::cout << "[Information]\n";
+    std::cout << "When you upload your file, special .info file in the \"./Data\" appears.\n";
+    std::cout << "Send this file to your friend.\n";
+    std::cout << "Then if you are in one net they will be able to download it\n";
+}
+
+void helpScreen() {
+    std::cout << "[Help]\n";
+    std::cout << "invite - get invite code (send it to your friend)\n";
+    std::cout << "connect <invite code> - connect by invite code\n";
+    std::cout << "upload <path to file> - upload file to the net\n";
+    std::cout << "download <path to .info file> - download file from the net\n";
+    std::cout << "Please, dont use paths with Russian characters\n";
+}
+
 int main() {
 
     setlocale(LC_ALL, "");
-
+    welcomeScreen();
     std::string localAddress, downloadsPath;
     uint16_t port;
     importSettings(localAddress, port, downloadsPath);
@@ -52,7 +83,11 @@ int main() {
     while (1) {
         std::string command;
         std::cin >> command;
-        if (command == "connect") {
+        if (command == "help") {
+            helpScreen();
+        } else if (command == "info") {
+            informationScreen();
+        } else if (command == "connect") {
             uint64_t inviteCode;
             readHex(inviteCode);
             node.addDirectConnection(inviteCode);
@@ -69,6 +104,8 @@ int main() {
             std::string filePath;
             std::cin >> filePath;
             node.uploadFile(filePath);
+        } else {
+            std::cout << "[Error]: There is no such command\n";
         }
     }
     node.stop();

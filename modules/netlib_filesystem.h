@@ -8,8 +8,6 @@ const std::string DATA_FILETYPE = ".data";
 
 const std::string DATA_PATH = "./Data";
 
-const uint16_t MAX_DOWNLOAD_PIECE_TIME = 90;
-
 namespace netlib {
     class FileSystem {
     public:
@@ -59,7 +57,14 @@ namespace netlib {
             std::vector<PieceInfo> pieces;
         };
 
-        bool checkExists(std::string &&path) {
+        bool checkExists(const std::string &&path) {
+            std::fstream file(path);
+            bool res = file.is_open();
+            file.close();
+            return res;
+        }
+
+        bool checkExists(const std::string &path) {
             std::fstream file(path);
             bool res = file.is_open();
             file.close();
@@ -90,28 +95,34 @@ namespace netlib {
             }
         }
 
-        bool checkFile(std::string &fileId) {
+        void updateFullFile(const std::string &path) {
+            std::string fileId;
+            size_t sha1Cnt;
+            std::fstream fin(path);
+            fin >> fileId >> sha1Cnt;
+            m_filesInfo[fileId].fileId = fileId;
+            m_filesInfo[fileId].pieces.resize(sha1Cnt);
+            for (size_t j = 0; j < sha1Cnt; j++) {
+                fin >> m_filesInfo[fileId].pieces[j].sha1 >> m_filesInfo[fileId].pieces[j].size;
+            }
+            fin >> m_filesInfo[fileId].fileName;
+            checkPieces(m_filesInfo[fileId]);
+        }
+
+        bool checkFile(const std::string &fileId) {
             if (m_filesInfo.find(fileId) == m_filesInfo.end())
                 return false;
-            bool flag = true;
             for (const auto &piece: m_filesInfo[fileId].pieces) {
                 if (piece.state != PieceState::Have) {
-                    flag = false;
-                    break;
+                    return false;
                 }
             }
-            if (flag)
-                return true;
-            return false;
+            return true;
         }
 
         uint64_t getNonePiece(std::string &fileId) {
             if (m_filesInfo.find(fileId) != m_filesInfo.end()) {
                 for (int i = 0; i < m_filesInfo[fileId].pieces.size(); i++) {
-                    if (m_filesInfo[fileId].pieces[i].state == PieceState::Open) {
-                        /*if (clock() - m_filesInfo[fileId].pieces[i].lastTime > MAX_DOWNLOAD_PIECE_TIME * CLOCKS_PER_SEC)
-                            m_filesInfo[fileId].pieces[i].state = PieceState::None;*/
-                    }
                     if (m_filesInfo[fileId].pieces[i].state == PieceState::None) {
                         m_filesInfo[fileId].pieces[i].state = PieceState::Open;
                         m_filesInfo[fileId].pieces[i].lastTime = clock();
@@ -126,7 +137,6 @@ namespace netlib {
         void addPiece(std::string &fileId, uint64_t pieceId) {
             if (m_filesInfo.find(fileId) == m_filesInfo.end())
                 return;
-
             if (m_filesInfo[fileId].pieces.size() <= pieceId)
                 return;
             if (checkPiece(m_filesInfo[fileId], pieceId))
@@ -146,11 +156,10 @@ namespace netlib {
             return path.substr(path.find_last_of("/\\") + 1);
         }
 
-        void splitFile(std::string path, uint64_t pieceSize = 131072) {
+        void splitFile(std::string path, const std::string& fileId, uint64_t pieceSize = 8388608) {
             if (!std::filesystem::exists(path))
                 return;
-            std::cout << "PARSING FILE:\n";
-            std::string fileId = netlib::SHA1::from_file(path);
+            std::cout << "[FILE-SYSTEM]: Parsing file:\n";
             std::fstream fout(DATA_PATH + "\\" + fileId + INFO_FILETYPE, std::ios::out);
             std::fstream fin(path, std::ios::in | std::ios::binary);
 
@@ -176,12 +185,16 @@ namespace netlib {
             }
             std::string fileName = getFileName(path);
             fout.write(fileName.data(), fileName.size());
-            std::cout << "FILE PARSED\n";
+            std::cout << "[FILE-SYSTEM]: File parsed\n";
             fin.close();
             fout.close();
         }
 
         std::string addFile(const std::string& path) {
+            if (!checkExists(path)) {
+                std::cout << "[FILE-SYSTEM]: File does not exist\n";
+                return "";
+            }
             std::string fileId;
             size_t sha1Cnt;
             std::fstream fin(path, std::ios::binary | std::ios::in);
@@ -192,11 +205,9 @@ namespace netlib {
             std::ofstream fout(DATA_PATH + "\\" + fileId + INFO_FILETYPE, std::ios::binary | std::ios::out);
             fout << fileId << " " << sha1Cnt;
             fout << fin.rdbuf();
-            m_filesInfo[fileId].pieces.resize(sha1Cnt);
-            for (size_t j = 0; j < sha1Cnt; j++) {
-                fin >> m_filesInfo[fileId].pieces[j].sha1 >> m_filesInfo[fileId].pieces[j].size;
-            }
-            checkPieces(m_filesInfo[fileId]);
+            fin.close();
+            fout.close();
+            updateFullFile(path);
             return fileId;
         }
 
@@ -206,7 +217,7 @@ namespace netlib {
 
         void mergePieces(FileInfo &fileInfo) {
             std::fstream fout;
-            std::cout << "MERGING FILE:\n";
+            std::cout << "[FILE-SYSTEM]: Merging file:\n";
             std::filesystem::create_directories(m_filesPath);
             fout.open(m_filesPath + "\\" + fileInfo.fileName, std::ios::out | std::ios::binary);
             for (int i = 0; i < fileInfo.pieces.size(); i++) {
@@ -215,7 +226,7 @@ namespace netlib {
                 fin.close();
                 std::cout << "merging file: " << i + 1 << "/" << fileInfo.pieces.size() << "\n";
             }
-            std::cout << "FILE MERGED\n";
+            std::cout << "[FILE-SYSTEM]: File merged:\n";
             fout.close();
         }
 
@@ -224,11 +235,18 @@ namespace netlib {
         }
 
         void uploadFile(std::string &path) {
+            if (!checkExists(path)) {
+                std::cout << "[FILE-SYSTEM]: File does not exist\n";
+                return;
+            }
+            std::cout << "[FILE-SYSTEM]: SHA-1 calculating...\n";
             std::string sha1 = netlib::SHA1::from_file(path);
             if (m_filesInfo.find(sha1) != m_filesInfo.end())
                 return;
-            splitFile(path);
-            addFile(DATA_PATH + "\\" + sha1 + INFO_FILETYPE);
+            splitFile(path, sha1);
+            std::cout << "[FILE-SYSTEM]: Checking...\n";
+            updateFullFile(DATA_PATH + "\\" + sha1 + INFO_FILETYPE);
+            std::cout << "[FILE-SYSTEM]: File uploaded\n";
         }
 
     private:
