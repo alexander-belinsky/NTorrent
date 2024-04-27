@@ -119,14 +119,14 @@ namespace netlib {
             shouldPing = true;
         }
 
-        void pong(uint16_t msgId) {
+        void pong(uint64_t msgId) {
             Message<T> msg(pongType_);
             msg << msgId;
             sendNoAnswer(msg);
             shouldPong = false;
         }
 
-        void tryPong(uint16_t msgId) {
+        void tryPong(uint64_t msgId) {
             if (!is_writing) {
                 pong(std::max(msgId, m_maxPong));
                 return;
@@ -162,7 +162,7 @@ namespace netlib {
         void endOfWriting() {
             bool shouldWait;
             tempMsgOut_ >> shouldWait;
-            uint16_t msgId;
+            uint64_t msgId;
             tempMsgOut_ >> msgId;
             tempMsgOut_ << msgId;
             tempMsgOut_ << shouldWait;
@@ -193,7 +193,7 @@ namespace netlib {
             }
             m_isConnected = true;
             if (tempMsgIn_.m_header.id == pongType_) {
-                uint16_t pongMsgId;
+                uint64_t pongMsgId;
                 tempMsgIn_ >> pongMsgId;
                 //std::cout << "pongId: " << pongMsgId << "\n";
                 while (pongMsgId + m_latestMsg.size() > lastSentId) {
@@ -202,7 +202,7 @@ namespace netlib {
             }
             else {
                 if (tempMsgIn_.m_header.id != pingType_) {
-                    uint16_t msgId;
+                    uint64_t msgId;
                     tempMsgIn_ >> msgId;
                     //std::cout << "msgId: " << msgId << "\n";
                     if (shouldAnswer && msgId <= lastGotId + 1) {
@@ -374,17 +374,15 @@ namespace netlib {
         Message<T> tempMsgIn_;
 
         SafeQueue<MemMsg> m_latestMsg;
-        uint16_t lastSentId = 0;
-        uint16_t lastGotId = 0;
-        uint16_t currentId = 0;
-
-        SafeQueue<uint16_t> m_pongIds;
+        uint64_t lastSentId = 0;
+        uint64_t lastGotId = 0;
+        uint64_t currentId = 0;
 
         std::mutex mutex_;
         bool is_writing = false;
 
         bool shouldPong = false;
-        uint16_t m_maxPong = 0;
+        uint64_t m_maxPong = 0;
         bool shouldPing = false;
 
         uint16_t id_;

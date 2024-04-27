@@ -156,7 +156,7 @@ namespace netlib {
             return path.substr(path.find_last_of("/\\") + 1);
         }
 
-        void splitFile(std::string path, const std::string& fileId, uint64_t pieceSize = 8388608) {
+        void splitFile(std::string path, const std::string& fileId, uint64_t pieceSize = 262144) {
             if (!std::filesystem::exists(path))
                 return;
             std::cout << "[FILE-SYSTEM]: Parsing file:\n";

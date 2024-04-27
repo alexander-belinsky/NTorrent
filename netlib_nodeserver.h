@@ -471,6 +471,7 @@ namespace netlib {
                 m_filesMap[id][fileId].fileStream.close();
                 finishSending(id, fileId);
             } else {
+                std::cout << "[FILE-SENDER]: " << bytesLeft << " " << "bytes left\n";
                 std::vector<char> buffer(std::min(bytesLeft, FILE_CHUNK_SIZE));
                 m_filesMap[id][fileId].fileStream.read(buffer.data(), buffer.size());
                 Message<TypesEnum> msg(TypesEnum::FileBodyMsgType);
